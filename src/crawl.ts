@@ -93,8 +93,8 @@ class Crawler {
 
         this.browser = await puppeteer.launch({
             args: [
-            //    '--proxy-server=127.0.0.1:8000',
-            //    '--ignore-certificate-errors',
+                '--proxy-server=127.0.0.1:8080',
+                '--ignore-certificate-errors',
                 '--disable-gpu',
                 `--ssl-key-log-file=${this.dataPath}/sslkeys.pms`
             ],

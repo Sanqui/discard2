@@ -1,5 +1,7 @@
-import { Warcprox } from './warcprox';
+import * as fs from 'fs/promises';
 import { spawn } from 'child_process';
+
+import { Mitmdump } from './mitmdump';
 
 let crawler_process;
 
@@ -31,19 +33,36 @@ async function run_crawler(): Promise<boolean> {
     })
 }
 
+let mitmdumpEnabled = true;
+
 (async () => {
-    //const warcprox = new Warcprox();
+    const jobName = process.argv[2];
+    if (jobName === undefined) {
+        console.log("Error: Must provide job name as argument");
+        process.exit(1);
+    }
+    await fs.mkdir(`out/${jobName}`, { recursive: true });
 
-    //process.on('uncaughtExceptionMonitor', err => {
-    //    warcprox.close();
-    //    crawler_process.kill();
-    //});
+    let mitmdump: Mitmdump;
 
-    //await warcprox.start();
+    if (mitmdumpEnabled) {
+        mitmdump = new Mitmdump(`out/${jobName}/mitmdump`);
+
+        process.on('uncaughtExceptionMonitor', err => {
+            if (mitmdump) {
+                mitmdump.close();
+            }
+            crawler_process.kill();
+        });
+
+        await mitmdump.start();
+    }
 
     while (await run_crawler() === true) {}
 
-    //await warcprox.close();
+    if (mitmdumpEnabled) {
+        await mitmdump.close();
+    }
 
     console.log("Bye");
 })();

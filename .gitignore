@@ -4,3 +4,4 @@ warcprox/
 *.js
 out/
 .env
+bin/

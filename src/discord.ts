@@ -31,15 +31,15 @@ export class DiscordProject implements Project {
             return [{type: TaskType.Login, url: new URL(page.url())}];
         },
         [TaskType.Login]: async (page: puppeteer_types.Page, url: URL) => {
-            await retryGoto(page, url);
+            //await retryGoto(page, url);
 
             await page.type('input[name="email"]', process.env.DISCORD_EMAIL);
             await page.type('input[name="password"]', process.env.DISCORD_PASSWORD);
 
             await clickAndWaitForNavigation(page, 'button[type="submit"]')
 
-            await page.waitForSelector('div[clas^="nameTag"]')
-            let nameTag = await page.$eval('div[clas^="nameTag"]', el => el.textContent);
+            await page.waitForSelector('div[class^="nameTag"]')
+            let nameTag = await page.$eval('div[class^="nameTag"]', el => el.textContent);
 
             console.log("Logged in: " + nameTag);
 
