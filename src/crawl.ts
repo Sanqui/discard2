@@ -1,11 +1,20 @@
 import { strict as assert } from 'assert';
-import puppeteer from 'puppeteer';
 import * as fs from 'fs/promises';
+
+import dotenv from 'dotenv';
+import * as puppeteer_types from 'puppeteer';
+import puppeteer from 'puppeteer-extra'
+import StealthPlugin from 'puppeteer-extra-plugin-stealth'
+
 import { DiscordProject } from './discord';
+
+dotenv.config();
+
+puppeteer.use(StealthPlugin());
 
 export interface Task {
     type: string,
-    url: URL
+    url?: URL
 }
 
 export type State = {
@@ -21,27 +30,28 @@ export type State = {
 
 export interface Project {
     initialTask: Task, // runs even after restart
-    firstTask: Task // first task to run
     taskFunctions: {
-        [index in string]: (page: puppeteer.Page, url: URL) => Promise<Task[]>
+        [index in string]: (page: puppeteer_types.Page, url: URL) => Promise<Task[]>
     }
 }
 
 class Crawler {
     jobName: string;
-    browser: puppeteer.Browser;
+    browser: puppeteer_types.Browser;
     state: State;
     project: Project;
+    dataPath: string;
 
     constructor(jobName: string, project: Project) {
         this.project = project;
         this.jobName = jobName;
+        this.dataPath = `out/${this.jobName}`;
     }
     
     async saveState() {
         this.state.jobSaved = new Date();
         return await fs.writeFile(
-            `out/${this.jobName}/state.json`,
+            `${this.dataPath}/state.json`,
             JSON.stringify(this.state,
                 (key, value) => {
                     if (key === 'page') {
@@ -56,7 +66,7 @@ class Crawler {
 
     async run() {
         try {
-            let contents = await fs.readFile(`out/${this.jobName}/state.json`, 'utf8');
+            let contents = await fs.readFile(`${this.dataPath}/state.json`, 'utf8');
             this.state = JSON.parse(contents);
             assert.equal(this.state.jobName, this.jobName);
             console.log("Restored job state");
@@ -77,17 +87,16 @@ class Crawler {
                 tasksFinished: []
             };
             console.log("Initiated new job state");
-            
-            this.state.tasksQueued.push(this.project.firstTask);
 
-            await fs.mkdir(`out/${this.jobName}`, { recursive: true });
+            await fs.mkdir(this.dataPath, { recursive: true });
         }
 
         this.browser = await puppeteer.launch({
             args: [
-                '--proxy-server=127.0.0.1:8000',
-                '--ignore-certificate-errors',
-                '--disable-gpu'
+            //    '--proxy-server=127.0.0.1:8000',
+            //    '--ignore-certificate-errors',
+                '--disable-gpu',
+                `--ssl-key-log-file=${this.dataPath}/sslkeys.pms`
             ],
             // Remove "Chrome is being controlled by automated test software" banner,
             // but brings some caveats
@@ -129,7 +138,12 @@ class Crawler {
 (async () => {
     const jobName = process.argv[2];
     if (jobName === undefined) {
-        console.log("Must provide job name as argument");
+        console.log("Error: Must provide job name as argument");
+        process.exit(1);
+    }
+
+    if (!process.env.DISCORD_EMAIL && !process.env.DISCORD_PASSWORD) {
+        console.log("Error: Must provide DISCORD_EMAIL and DISCORD_PASSWORD env variables (you may use a .env file)");
         process.exit(1);
     }
 

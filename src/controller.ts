@@ -32,18 +32,18 @@ async function run_crawler(): Promise<boolean> {
 }
 
 (async () => {
-    const warcprox = new Warcprox();
+    //const warcprox = new Warcprox();
 
-    process.on('uncaughtExceptionMonitor', err => {
-        warcprox.close();
-        crawler_process.kill();
-    });
+    //process.on('uncaughtExceptionMonitor', err => {
+    //    warcprox.close();
+    //    crawler_process.kill();
+    //});
 
-    await warcprox.start();
+    //await warcprox.start();
 
     while (await run_crawler() === true) {}
 
-    await warcprox.close();
+    //await warcprox.close();
 
     console.log("Bye");
 })();

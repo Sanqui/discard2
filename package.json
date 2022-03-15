@@ -1,6 +1,9 @@
 {
   "dependencies": {
-    "puppeteer": "^13.0.1"
+    "dotenv": "^16.0.0",
+    "puppeteer": "^13.5.1",
+    "puppeteer-extra": "^3.2.3",
+    "puppeteer-extra-plugin-stealth": "^2.9.0"
   },
   "devDependencies": {
     "ts-node": "^10.7.0",
