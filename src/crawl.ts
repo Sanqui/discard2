@@ -12,13 +12,16 @@ dotenv.config();
 
 puppeteer.use(StealthPlugin());
 
+export type TaskType = string;
+
 export interface Task {
-    type: string,
+    type: TaskType,
     url?: URL
 }
 
 export type State = {
     jobName: string,
+    jobMode: string,
     jobStarted: Date,
     jobSaved: Date | null,
     jobFinished: Date | null,
@@ -30,22 +33,32 @@ export type State = {
 
 export interface Project {
     initialTask: Task, // runs even after restart
+    modeTasks: {
+        [index in string]: Task
+    }
     taskFunctions: {
-        [index in string]: (page: puppeteer_types.Page, url: URL) => Promise<Task[]>
+        [index in TaskType]: (page: puppeteer_types.Page, url: URL) => Promise<Task[]>
     }
 }
 
 class Crawler {
     jobName: string;
+    mode: string;
     browser: puppeteer_types.Browser;
     state: State;
     project: Project;
     dataPath: string;
 
-    constructor(jobName: string, project: Project) {
+    constructor(jobName: string, mode: string, project: Project) {
         this.project = project;
+        this.mode = mode;
         this.jobName = jobName;
         this.dataPath = `out/${this.jobName}`;
+
+        if (!(mode in this.project.modeTasks)) {
+            console.log("Error: Mode must be one of: " + Object.keys(this.project.modeTasks));
+            process.exit(1);
+        }
     }
     
     async saveState() {
@@ -78,6 +91,7 @@ class Crawler {
         } catch (error) {
             this.state = {
                 jobName: this.jobName,
+                jobMode: this.mode,
                 jobStarted: new Date(),
                 jobSaved: null,
                 jobFinished: null,
@@ -96,7 +110,7 @@ class Crawler {
                 '--proxy-server=127.0.0.1:8080',
                 '--ignore-certificate-errors',
                 '--disable-gpu',
-                `--ssl-key-log-file=${this.dataPath}/sslkeys.pms`
+            //    `--ssl-key-log-file=${this.dataPath}/sslkeys.pms`
             ],
             // Remove "Chrome is being controlled by automated test software" banner,
             // but brings some caveats
@@ -106,6 +120,8 @@ class Crawler {
             headless: false
         });
         const page = await this.browser.newPage();
+
+        this.state.tasksQueued.unshift(this.project.modeTasks[this.mode]);
 
         this.state.tasksQueued.unshift(this.project.initialTask);
 
@@ -141,6 +157,11 @@ class Crawler {
         console.log("Error: Must provide job name as argument");
         process.exit(1);
     }
+    const mode = process.argv[3];
+    if (mode === undefined) {
+        console.log("Error: Must provide mode as second argument (e.g. `profile`)");
+        process.exit(1);
+    }
 
     if (!process.env.DISCORD_EMAIL && !process.env.DISCORD_PASSWORD) {
         console.log("Error: Must provide DISCORD_EMAIL and DISCORD_PASSWORD env variables (you may use a .env file)");
@@ -149,6 +170,7 @@ class Crawler {
 
     const crawler = new Crawler(
         jobName,
+        mode,
         new DiscordProject()
     );
 

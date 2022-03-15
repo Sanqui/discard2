@@ -1,12 +1,13 @@
 import * as puppeteer_types from 'puppeteer';
 import {retryGoto, clickAndWaitForNavigation, getUrlsFromLinks} from './utils';
-import {Project, Task} from './crawl';
+import {Project, Task, TaskType} from './crawl';
 
 const discord_url = new URL("https://discord.com/");
 
-export enum TaskType {
+export enum DiscordTaskType {
     Initial = "initial",
     Login = "login",
+    Profile = "profile",
 }
 
 export class DiscordTask implements Task {
@@ -15,22 +16,26 @@ export class DiscordTask implements Task {
 }
 
 export class DiscordProject implements Project {
-    static readonly TaskType = TaskType;
+    static readonly TaskType = DiscordTaskType;
 
     initialTask = {
-        type: TaskType.Initial,
+        type: DiscordTaskType.Initial,
         url: discord_url
     }
 
+    modeTasks = {
+        "profile": {type: DiscordTaskType.Profile}
+    }
+
     taskFunctions = {
-        [TaskType.Initial]: async (page: puppeteer_types.Page, url: URL) => {
+        [DiscordTaskType.Initial]: async (page: puppeteer_types.Page, url: URL) => {
             await retryGoto(page, url);
         
             await clickAndWaitForNavigation(page, 'a[href="//discord.com/login"]');
 
-            return [{type: TaskType.Login, url: new URL(page.url())}];
+            return [{type: DiscordTaskType.Login, url: new URL(page.url())}];
         },
-        [TaskType.Login]: async (page: puppeteer_types.Page, url: URL) => {
+        [DiscordTaskType.Login]: async (page: puppeteer_types.Page, url: URL) => {
             //await retryGoto(page, url);
 
             await page.type('input[name="email"]', process.env.DISCORD_EMAIL);
@@ -42,6 +47,13 @@ export class DiscordProject implements Project {
             let nameTag = await page.$eval('div[class^="nameTag"]', el => el.textContent);
 
             console.log("Logged in: " + nameTag);
+
+            return []
+        },
+        [DiscordTaskType.Profile]: async (page: puppeteer_types.Page) => {
+            await page.click('button[aria-label="User Settings"]')
+
+            await page.waitForSelector("#my-account-tab")
 
             return []
         }
