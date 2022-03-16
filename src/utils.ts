@@ -10,7 +10,7 @@ export async function getUrlsFromLinks(page: puppeteer.Page, selector: string): 
 }
 
 // Inspired by https://stackoverflow.com/a/56892074
-export async function retry(promiseFactory, retryCount: number) {
+export async function retry(promiseFactory, retryCount: number, name?: string) {
     try {
         return await promiseFactory();
     } catch (error) {
@@ -19,8 +19,12 @@ export async function retry(promiseFactory, retryCount: number) {
         }
 
         if (error instanceof puppeteer.errors.TimeoutError) {
-            console.log(`TimeoutError, retrying ${retryCount - 1} more times`);
-            return await retry(promiseFactory, retryCount - 1);
+            let error_string = "TimeoutError"
+            if (name) {
+                error_string = `${error_string} when ${name}`
+            }
+            console.log(`${error_string}, retrying ${retryCount - 1} more times`);
+            return await retry(promiseFactory, retryCount - 1, name);
         } else {
             throw error;
         }
@@ -31,7 +35,7 @@ export async function clickAndWaitForNavigation(page: puppeteer.Page, selector: 
     return await retry(
         () => Promise.all([
             page.click(selector),
-            page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 10000})
+            page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 30000})
         ]),
         numRetries // retry count
     );

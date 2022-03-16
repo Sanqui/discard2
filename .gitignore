@@ -5,3 +5,4 @@ warcprox/
 out/
 .env
 bin/
+session/

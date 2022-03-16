@@ -1,6 +1,7 @@
 import { strict as assert } from 'assert';
 import * as fs from 'fs/promises';
 
+import pressAnyKey from 'press-any-key';
 import dotenv from 'dotenv';
 import * as puppeteer_types from 'puppeteer';
 import puppeteer from 'puppeteer-extra'
@@ -12,7 +13,7 @@ dotenv.config();
 
 puppeteer.use(StealthPlugin());
 
-export type TaskType = string;
+export type TaskType = Readonly<string | number>;
 
 export interface Task {
     type: TaskType,
@@ -65,14 +66,6 @@ class Crawler {
         this.state.jobSaved = new Date();
         return await fs.writeFile(
             `${this.dataPath}/state.json`,
-            JSON.stringify(this.state,
-                (key, value) => {
-                    if (key === 'page') {
-                        return null;
-                    }
-                    return value;
-                }
-            ),
             'utf8'
         );
     }
@@ -117,7 +110,8 @@ class Crawler {
             // see https://github.com/GoogleChrome/chrome-launcher/blob/master/docs/chrome-flags-for-tools.md#test--debugging-flags
             //ignoreDefaultArgs: ["--enable-automation"],
 
-            headless: false
+            headless: false,
+            userDataDir: process.env.BROWSER_DATA_DIR
         });
         const page = await this.browser.newPage();
 
@@ -130,7 +124,7 @@ class Crawler {
             this.state.currentTask = task;
             this.saveState();
 
-            console.log(`Task: ${task.type} ${task.url} (${this.state.tasksQueued.length} more)`);
+            console.log(`*** Task: ${task.type} (${this.state.tasksQueued.length} more)`);
 
             let newTasks = await this.project.taskFunctions[task.type](page, task.url);
             this.state.tasksQueued = [
@@ -168,6 +162,11 @@ class Crawler {
         process.exit(1);
     }
 
+    if (!process.env.BROWSER_DATA_DIR) {
+        console.log("Error: Must provide BROWSER_DATA_DIR env variable (you may use a .env file)");
+        process.exit(1);
+    }
+
     const crawler = new Crawler(
         jobName,
         mode,
@@ -183,5 +182,11 @@ class Crawler {
         }
     });
 
-    await crawler.run();
+    try {
+        await crawler.run();
+    } catch (error) {
+        console.log("Caught error: " + error.message);
+        await pressAnyKey("Press any key to exit...");
+        throw error;
+    }
 })();
