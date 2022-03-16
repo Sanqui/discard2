@@ -1,15 +1,11 @@
 import { strict as assert } from 'assert';
 import * as fs from 'fs/promises';
 
-import pressAnyKey from 'press-any-key';
-import dotenv from 'dotenv';
 import * as puppeteer_types from 'puppeteer';
 import puppeteer from 'puppeteer-extra'
 import StealthPlugin from 'puppeteer-extra-plugin-stealth'
 
-import { DiscordProject } from './discord';
-
-dotenv.config();
+import { Mitmdump } from './mitmdump';
 
 puppeteer.use(StealthPlugin());
 
@@ -42,30 +38,34 @@ export interface Project {
     }
 }
 
-class Crawler {
+export class Crawler {
     jobName: string;
     mode: string;
     browser: puppeteer_types.Browser;
     state: State;
     project: Project;
     dataPath: string;
+    mitmdump: Mitmdump;
 
-    constructor(jobName: string, mode: string, project: Project) {
+    constructor(project: Project, mode: string, browserDataDir: string) {
         this.project = project;
-        this.mode = mode;
-        this.jobName = jobName;
-        this.dataPath = `out/${this.jobName}`;
 
         if (!(mode in this.project.modeTasks)) {
             console.log("Error: Mode must be one of: " + Object.keys(this.project.modeTasks));
             process.exit(1);
         }
+        this.mode = mode;
+        // set job name to UTC timestamp
+        this.jobName = new Date().toISOString() + '-' + mode;
+        this.dataPath = `out/${this.jobName}`;
+        this.mitmdump = new Mitmdump(this.dataPath + '/mitmdump');
     }
     
     async saveState() {
         this.state.jobSaved = new Date();
         return await fs.writeFile(
             `${this.dataPath}/state.json`,
+            JSON.stringify(this.state, null, 2),
             'utf8'
         );
     }
@@ -97,6 +97,8 @@ class Crawler {
 
             await fs.mkdir(this.dataPath, { recursive: true });
         }
+
+        await this.mitmdump.start()
 
         this.browser = await puppeteer.launch({
             args: [
@@ -142,37 +144,11 @@ class Crawler {
         this.saveState();
 
         await this.browser.close();
+        await this.mitmdump.close();
     }
 }
 
-(async () => {
-    const jobName = process.argv[2];
-    if (jobName === undefined) {
-        console.log("Error: Must provide job name as argument");
-        process.exit(1);
-    }
-    const mode = process.argv[3];
-    if (mode === undefined) {
-        console.log("Error: Must provide mode as second argument (e.g. `profile`)");
-        process.exit(1);
-    }
-
-    if (!process.env.DISCORD_EMAIL && !process.env.DISCORD_PASSWORD) {
-        console.log("Error: Must provide DISCORD_EMAIL and DISCORD_PASSWORD env variables (you may use a .env file)");
-        process.exit(1);
-    }
-
-    if (!process.env.BROWSER_DATA_DIR) {
-        console.log("Error: Must provide BROWSER_DATA_DIR env variable (you may use a .env file)");
-        process.exit(1);
-    }
-
-    const crawler = new Crawler(
-        jobName,
-        mode,
-        new DiscordProject()
-    );
-
+/*(async () => {
     process.on('uncaughtExceptionMonitor', err => {
         // We cannot recover from this error, but Puppeteer sometimes throws it.
         // At least let the parent process know it should restart.
@@ -190,3 +166,4 @@ class Crawler {
         throw error;
     }
 })();
+*/

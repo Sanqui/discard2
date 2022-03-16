@@ -30,6 +30,9 @@ export class Mitmdump {
                 return;
             }
         }*/
+        // Quiet mitmdump produces no output, so just wait a second
+        // for it to pick itself up...
+        await new Promise(r => setTimeout(r, 1000));
     }
 
     async close() {
