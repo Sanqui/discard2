@@ -2,6 +2,7 @@ node_modules/
 .venv/
 warcprox/
 *.js
+!jest.config.js
 out/
 .env
 bin/
