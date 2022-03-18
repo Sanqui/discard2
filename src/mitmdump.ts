@@ -1,4 +1,21 @@
 import { spawn } from 'child_process';
+import * as fs from 'fs';
+
+const MITMDUMP_PATHS = ['mitmproxy/venv/bin/mitmdump', 'bin/mitmdump'];
+let mitmdumpPath: string = null;
+
+for (const path of MITMDUMP_PATHS) {
+    if (fs.existsSync(path)) {
+        mitmdumpPath = path;
+        break;
+    }
+}
+
+if (!mitmdumpPath) {
+    throw new Error('Could not find mitmdump');
+}
+
+console.log(`Using mitmdump at ${mitmdumpPath}`);
 
 export class Mitmdump {
     process: any;
@@ -20,7 +37,6 @@ export class Mitmdump {
         } else {
             args = ["-q", "--server-replay", this.filePath]
         }
-        this.process = spawn('bin/mitmdump', args)
         this.closed = false;
 
         process.on('beforeExit', async () => {
@@ -29,15 +45,15 @@ export class Mitmdump {
             }
         });
 
-        this.process.stderr.on('data', data => {
-            console.log("mitmdump stderr: ", data.toString());
-            throw new Error(`mitmdump failed`);
-        });
-
-        this.process.on('exit', code => {
+        this.process = spawn(mitmdumpPath, args).on('exit', code => {
             if (code != 0) {
                 throw new Error(`mitmdump exited with code ${code}`);
             }
+        });
+
+        this.process.stderr.on('data', data => {
+            console.log("mitmdump stderr: ", data.toString());
+            //throw new Error(`mitmdump failed`);
         });
 
         /*let stdout = '';

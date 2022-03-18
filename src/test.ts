@@ -5,7 +5,7 @@ import * as fs from 'fs/promises';
 const TEST_DISCORD_EMAIL = "test_ahcae@protonmail.com";
 const TEST_DISCORD_PASSWORD = "9jVjMMp11QY1sMiJh87hDShqQ";
 
-jest.setTimeout(30_000);
+jest.setTimeout(45_000);
 
 test('initializes a crawler', async () => {
     const crawler = new Crawler({
@@ -28,4 +28,7 @@ test('runs a profile job against a replay', async () => {
 
     await crawler.run()
     expect(crawler).toBeTruthy();
+
+    let state = JSON.parse(await fs.readFile(`${crawler.dataPath}/state.json`, 'utf8'));
+    expect(state.jobFinished).toBeTruthy();
 });

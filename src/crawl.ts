@@ -157,7 +157,6 @@ export class Crawler {
         this.state.currentTask = null;
 
         console.log("All tasks completed")
-
         this.state.jobFinished = new Date();
         this.saveState();
 
