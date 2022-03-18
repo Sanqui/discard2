@@ -40,10 +40,14 @@ export class Mitmdump {
         this.closed = false;
 
         process.on('beforeExit', async () => {
-            if (!this.closed) {
                 await this.close();
             }
-        });
+        );
+
+        process.on('uncaughtExceptionMonitor', async () => {
+                await this.close();
+            }
+        );
 
         this.process = spawn(mitmdumpPath, args).on('exit', code => {
             if (code != 0) {
@@ -70,8 +74,10 @@ export class Mitmdump {
     }
 
     async close() {
-        console.log("Stopping mitmdump");
-        await this.process.kill();
-        this.closed = true;
+        if (!this.closed) {
+            console.log("Stopping mitmdump");
+            await this.process.kill();
+            this.closed = true;
+        }
     }
 }

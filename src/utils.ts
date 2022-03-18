@@ -47,3 +47,12 @@ export async function retryGoto(page: puppeteer.Page, url: URL) {
         numRetries
     );
 }
+
+export async function waitForAndClick(page: puppeteer.Page, selector: string, error_message: string) {
+    try {
+        await page.waitForSelector(selector, { timeout: 5000 })
+    } catch (e) {
+        throw new Error(error_message)
+    }
+    await page.click(selector);
+}

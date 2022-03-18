@@ -1,5 +1,5 @@
 import * as puppeteer_types from 'puppeteer';
-import {retry, retryGoto, clickAndWaitForNavigation, getUrlsFromLinks} from './utils';
+import {retry, retryGoto, clickAndWaitForNavigation, getUrlsFromLinks, waitForAndClick} from './utils';
 import {Project, Task} from './crawl';
 
 const discord_url = new URL("https://discord.com/");
@@ -53,6 +53,7 @@ export class LoginDiscordTask extends DiscordTask {
         let nameTag = await page.$eval('div[class^="nameTag"]', el => el.textContent);
 
         console.log("Logged in: " + nameTag);
+        await page.waitForTimeout(1000);
     }
 }
 
@@ -67,6 +68,62 @@ export class ProfileDiscordTask extends DiscordTask {
             3,
             "opening user settings"
         )
+    }
+}
+
+export class ChannelDiscordTask extends DiscordTask {
+    type = "ChannelDiscordTask";
+    constructor(
+        public serverId: string,
+        public channelId: string,
+        public after?: string,
+        public before?: string,
+    ) {
+        super();
+    }
+
+    async perform(page: puppeteer_types.Page) {
+        await waitForAndClick(page, 
+            `[data-list-item-id=guildsnav___${this.serverId}]`,
+            `Server ID ${this.serverId} not found`
+        );
+
+        await waitForAndClick(page, 
+            `[data-list-item-id=channels___${this.channelId}]`,
+            `Channel ID ${this.channelId} not found`
+        );
+
+        console.log(`Channel ${this.channelId} opened`)
+
+        await page.keyboard.down('Control');
+        await page.keyboard.press('KeyF');
+        await page.keyboard.up('Control');
+
+        console.log("after: " + this.after)
+        console.log("before: " + this.before)
+        if (this.after) {
+            await page.keyboard.type('after:' + this.after, {delay: 100});
+        }
+        if (this.before) {
+            await page.keyboard.type('before:' + this.before, {delay: 100});
+        }
+
+        await page.keyboard.press('Enter');
+
+        await waitForAndClick(page, 
+            `div[aria-controls="oldest-tab"]`,
+            `"Oldest" tab in search didn't show up`
+        );
+
+        await page.waitForTimeout(500);
+
+        await page.click(`div[aria-controls="oldest-tab"]`);
+
+        console.log("Performed search");
+
+        await page.waitForTimeout(5000);
+
+        // TODO iterate over more messages
     }
 }
     

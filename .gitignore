@@ -7,5 +7,5 @@ out/
 .env
 bin/
 mitmproxy/
-session/
+sessions/
 coverage/
