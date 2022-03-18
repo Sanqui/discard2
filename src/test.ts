@@ -1,5 +1,5 @@
 import { Crawler } from './crawl';
-import { DiscordProject } from './discord';
+import { DiscordProject, ProfileDiscordTask } from './discord';
 import * as fs from 'fs/promises';
 
 const TEST_DISCORD_EMAIL = "test_ahcae@protonmail.com";
@@ -10,6 +10,7 @@ jest.setTimeout(45_000);
 test('initializes a crawler', async () => {
     const crawler = new Crawler({
         project: new DiscordProject(TEST_DISCORD_EMAIL, TEST_DISCORD_PASSWORD),
+        tasks: [],
         mode: 'profile',
         outputDir: await fs.mkdtemp("/tmp/discard2-test-"),
         headless: true,
@@ -20,6 +21,7 @@ test('initializes a crawler', async () => {
 test('runs a profile job against a replay', async () => {
     const crawler = new Crawler({
         project: new DiscordProject(TEST_DISCORD_EMAIL, TEST_DISCORD_PASSWORD),
+        tasks: [new ProfileDiscordTask()],
         mode: 'profile',
         outputDir: await fs.mkdtemp("/tmp/discard2-test-"),
         serverSideReplayFile: './test_data/profile/mitmdump',

@@ -9,11 +9,10 @@ import { Mitmdump } from './mitmdump';
 
 puppeteer.use(StealthPlugin());
 
-export type TaskType = Readonly<string | number>;
-
-export interface Task {
-    type: TaskType,
-    url?: URL
+export class Task {
+    async perform(page: puppeteer_types.Page): Promise<Task[] | void> {
+        return [];
+    }
 }
 
 export type State = {
@@ -29,17 +28,12 @@ export type State = {
 }
 
 export interface Project {
-    initialTask: Task, // runs even after restart
-    modeTasks: {
-        [index in string]: Task
-    }
-    taskFunctions: {
-        [index in TaskType]: (page: puppeteer_types.Page, url: URL) => Promise<Task[]>
-    }
+    initialTasks: Task[], // runs even after restart
 }
 
 interface CrawlerParams {
     project: Project,
+    tasks: Task[],
     mode: string,
     outputDir?: string,
     browserDataDir?: string,
@@ -57,14 +51,12 @@ export class Crawler {
     mitmdump: Mitmdump;
     startMitmdump: boolean = true;
     headless: boolean;
+    tasks: Task[];
 
     constructor(params: CrawlerParams) {
         this.project = params.project;
 
-        if (!(params.mode in this.project.modeTasks)) {
-            console.log("Error: Mode must be one of: " + Object.keys(this.project.modeTasks));
-            process.exit(1);
-        }
+        this.tasks = params.tasks;
         this.mode = params.mode;
         // set job name to UTC timestamp
         this.jobName = new Date().toISOString() + '-' + params.mode;
@@ -88,6 +80,7 @@ export class Crawler {
 
     async run() {
         try {
+            throw new Error('Resuming a job is not currently implemented');
             let contents = await fs.readFile(`${this.dataPath}/state.json`, 'utf8');
             this.state = JSON.parse(contents);
             assert.equal(this.state.jobName, this.jobName);
@@ -135,22 +128,25 @@ export class Crawler {
         });
         const page = await this.browser.newPage();
 
-        this.state.tasksQueued.unshift(this.project.modeTasks[this.mode]);
-
-        this.state.tasksQueued.unshift(this.project.initialTask);
+        this.state.tasksQueued = [
+            ...this.project.initialTasks,
+            ...this.tasks,
+            ...this.state.tasksQueued];
 
         while (this.state.tasksQueued.length > 0) {
             const task = this.state.tasksQueued.shift();
             this.state.currentTask = task;
             this.saveState();
 
-            console.log(`*** Task: ${task.type} (${this.state.tasksQueued.length} more)`);
+            console.log(`*** Task: ${task.constructor.name} (${this.state.tasksQueued.length} more)`);
 
-            let newTasks = await this.project.taskFunctions[task.type](page, task.url);
-            this.state.tasksQueued = [
-                ...newTasks,
-                ...this.state.tasksQueued
-            ]
+            let newTasks = await task.perform(page);
+            if (newTasks) {
+                this.state.tasksQueued = [
+                    ...newTasks,
+                    ...this.state.tasksQueued
+                ]
+            }
             this.state.tasksFinished.push(task);
         }
 

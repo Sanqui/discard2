@@ -2,5 +2,7 @@
 module.exports = {
   preset: 'ts-jest',
   testEnvironment: 'node',
-  modulePathIgnorePatterns: ["mitmproxy"]
+  modulePathIgnorePatterns: ["mitmproxy"],
+  // https://github.com/facebook/jest/issues/7962#issuecomment-495272339
+  coveragePathIgnorePatterns: ["discord.ts"],
 };

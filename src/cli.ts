@@ -3,7 +3,7 @@ import dotenv from 'dotenv';
 import { Command, Option } from 'commander';
 
 import { Crawler } from './crawl';
-import { DiscordProject } from './discord';
+import { DiscordProject, ProfileDiscordTask } from './discord';
 
 dotenv.config();
 
@@ -27,6 +27,7 @@ program.command('profile')
     .action(async () => {
         const crawler = new Crawler({
             project: new DiscordProject(program.opts().email, program.opts().password),
+            tasks: [new ProfileDiscordTask()],
             mode: 'profile',
             browserDataDir: program.opts().browserDataDir
         });
