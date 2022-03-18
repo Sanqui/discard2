@@ -17,6 +17,16 @@ export class DiscordTask implements Task {
 
 export class DiscordProject implements Project {
     static readonly TaskType = DiscordTaskType;
+    discordEmail: string;
+    discordPassword: string;
+
+    constructor(discordEmail: string, discordPassword: string) {
+        if (!discordEmail || !discordPassword) {
+            throw new Error("Discord email and password must be provided");
+        }
+        this.discordEmail = discordEmail;
+        this.discordPassword = discordPassword;
+    }
 
     initialTask = {
         type: DiscordTaskType.Initial
@@ -37,10 +47,11 @@ export class DiscordProject implements Project {
 
             await page.waitForSelector("#app-mount")
 
+            let this_ = this;
             async function fillInLoginForm() {
                 console.log("Filling in login form")
-                await page.type('input[name="email"]', process.env.DISCORD_EMAIL);
-                await page.type('input[name="password"]', process.env.DISCORD_PASSWORD);
+                await page.type('input[name="email"]', this_.discordEmail);
+                await page.type('input[name="password"]', this_.discordPassword);
 
                 await clickAndWaitForNavigation(page, 'button[type="submit"]')
             }

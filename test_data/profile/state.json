@@ -1,0 +1,21 @@
+{
+  "jobName": "2022-03-18T13:11:09.001Z-profile",
+  "jobMode": "profile",
+  "jobStarted": "2022-03-18T13:11:09.002Z",
+  "jobSaved": "2022-03-18T13:11:24.684Z",
+  "jobFinished": "2022-03-18T13:11:24.684Z",
+  "tasksFailed": [],
+  "currentTask": null,
+  "tasksQueued": [],
+  "tasksFinished": [
+    {
+      "type": "initial"
+    },
+    {
+      "type": "login"
+    },
+    {
+      "type": "profile"
+    }
+  ]
+}

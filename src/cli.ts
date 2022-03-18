@@ -25,11 +25,11 @@ program
 program.command('profile')
     .description('Log in and fetch profile information')
     .action(async () => {
-        const crawler = new Crawler(
-            new DiscordProject(),
-            'profile',
-            program.opts().browserDataDir
-        );
+        const crawler = new Crawler({
+            project: new DiscordProject(program.opts().discordEmail, program.opts().discordPassword),
+            mode: 'profile',
+            browserDataDir: program.opts().browserDataDir
+        });
 
         try {
             await crawler.run();

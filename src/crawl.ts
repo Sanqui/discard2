@@ -38,6 +38,15 @@ export interface Project {
     }
 }
 
+interface CrawlerParams {
+    project: Project,
+    mode: string,
+    outputDir?: string,
+    browserDataDir?: string,
+    serverSideReplayFile?: string,
+    headless?: boolean,
+}
+
 export class Crawler {
     jobName: string;
     mode: string;
@@ -46,19 +55,26 @@ export class Crawler {
     project: Project;
     dataPath: string;
     mitmdump: Mitmdump;
+    startMitmdump: boolean = true;
+    headless: boolean;
 
-    constructor(project: Project, mode: string, browserDataDir: string) {
-        this.project = project;
+    constructor(params: CrawlerParams) {
+        this.project = params.project;
 
-        if (!(mode in this.project.modeTasks)) {
+        if (!(params.mode in this.project.modeTasks)) {
             console.log("Error: Mode must be one of: " + Object.keys(this.project.modeTasks));
             process.exit(1);
         }
-        this.mode = mode;
+        this.mode = params.mode;
         // set job name to UTC timestamp
-        this.jobName = new Date().toISOString() + '-' + mode;
-        this.dataPath = `out/${this.jobName}`;
-        this.mitmdump = new Mitmdump(this.dataPath + '/mitmdump');
+        this.jobName = new Date().toISOString() + '-' + params.mode;
+        this.dataPath = (params.outputDir || 'out') + `/${this.jobName}`;
+        if (!params.serverSideReplayFile) {
+            this.mitmdump = new Mitmdump(this.dataPath + '/mitmdump');
+        } else {
+            this.mitmdump = new Mitmdump(params.serverSideReplayFile, true);
+        }
+        this.headless = params.headless || false;
     }
     
     async saveState() {
@@ -98,7 +114,9 @@ export class Crawler {
             await fs.mkdir(this.dataPath, { recursive: true });
         }
 
-        await this.mitmdump.start()
+        if (this.startMitmdump) {
+            await this.mitmdump.start()
+        }
 
         this.browser = await puppeteer.launch({
             args: [
@@ -112,8 +130,8 @@ export class Crawler {
             // see https://github.com/GoogleChrome/chrome-launcher/blob/master/docs/chrome-flags-for-tools.md#test--debugging-flags
             //ignoreDefaultArgs: ["--enable-automation"],
 
-            headless: false,
-            userDataDir: process.env.BROWSER_DATA_DIR
+            headless: this.headless,
+            userDataDir: process.env.BROWSER_DATA_DIR || undefined
         });
         const page = await this.browser.newPage();
 
@@ -144,7 +162,9 @@ export class Crawler {
         this.saveState();
 
         await this.browser.close();
-        await this.mitmdump.close();
+        if (this.startMitmdump) {
+            await this.mitmdump.close();
+        }
     }
 }
 

@@ -16,6 +16,6 @@
   },
   "scripts": {
     "start": "ts-node ./src/cli.ts",
-    "test": "jest"
+    "test": "jest --detectOpenHandles"
   }
 }

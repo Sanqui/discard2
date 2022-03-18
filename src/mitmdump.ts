@@ -3,17 +3,35 @@ import { spawn } from 'child_process';
 export class Mitmdump {
     process: any;
     filePath: string;
+    replay: boolean;
+    closed: boolean;
 
-    constructor(filePath: string) {
+    constructor(filePath: string, replay?: boolean) {
         this.filePath = filePath;
+        this.replay = replay || false;
+        this.closed = true;
     }
 
     async start() {
         console.log("Starting mitmdump");
-        this.process = spawn('bin/mitmdump', ["-q", "-w", this.filePath])
+        let args = [];
+        if (!this.replay) {
+            args = ["-q", "-w", this.filePath]
+        } else {
+            args = ["-q", "--server-replay", this.filePath]
+        }
+        this.process = spawn('bin/mitmdump', args)
+        this.closed = false;
+
+        process.on('beforeExit', async () => {
+            if (!this.closed) {
+                await this.close();
+            }
+        });
 
         this.process.stderr.on('data', data => {
             console.log("mitmdump stderr: ", data.toString());
+            throw new Error(`mitmdump failed`);
         });
 
         this.process.on('exit', code => {
@@ -37,6 +55,7 @@ export class Mitmdump {
 
     async close() {
         console.log("Stopping mitmdump");
-        this.process.kill();
+        await this.process.kill();
+        this.closed = true;
     }
 }
