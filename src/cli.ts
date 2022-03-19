@@ -42,7 +42,7 @@ async function crawler(mode: string, tasks: Task[]) {
 program.command('profile')
     .description('Log in and fetch profile information')
     .action( async () => {
-        crawler('profile', [new ProfileDiscordTask()])
+        crawler('profile', [])
     });
 
 program.command('channel')

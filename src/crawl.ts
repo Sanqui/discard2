@@ -116,6 +116,7 @@ export class Crawler {
                 '--proxy-server=127.0.0.1:8080',
                 '--ignore-certificate-errors',
                 '--disable-gpu',
+                '--force-prefers-reduced-motion',
             //    `--ssl-key-log-file=${this.dataPath}/sslkeys.pms`
             ],
             // Remove "Chrome is being controlled by automated test software" banner,

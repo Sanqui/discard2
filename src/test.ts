@@ -23,7 +23,7 @@ test('initializes a crawler', async () => {
     const crawler = new Crawler({
         project: new DiscordProject(TEST_DISCORD_EMAIL, TEST_DISCORD_PASSWORD),
         tasks: [],
-        mode: 'profile',
+        mode: 'none',
         outputDir: await fs.mkdtemp("/tmp/discard2-test-"),
         headless: true,
     });
@@ -33,7 +33,7 @@ test('initializes a crawler', async () => {
 test('runs a profile job against a replay', async () => {
     const crawler = new Crawler({
         project: new DiscordProject(TEST_DISCORD_EMAIL, TEST_DISCORD_PASSWORD),
-        tasks: [new ProfileDiscordTask()],
+        tasks: [],
         mode: 'profile',
         outputDir: await fs.mkdtemp("/tmp/discard2-test-"),
         serverSideReplayFile: './test_data/profile/mitmdump',

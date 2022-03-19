@@ -62,6 +62,12 @@ export class LoginDiscordTask extends DiscordTask {
 }
 
 export class ProfileDiscordTask extends DiscordTask {
+    constructor(
+        public discordEmail?: string,
+    ) {
+        super();
+    }
+
     type = "ProfileDiscordTask";
     async perform(page: puppeteer_types.Page) {
         await retry(
@@ -72,6 +78,44 @@ export class ProfileDiscordTask extends DiscordTask {
             3,
             "opening user settings"
         )
+        await page.waitForSelector('#my-account-tab')
+
+        const emailDivXpath = `//*[@id="my-account-tab"]//h5[contains(., 'Email')]/following-sibling::div[1]`;
+
+        const [revealEmailButton] = await page.$x(
+            emailDivXpath + `//button`
+        );
+
+        let email: string = null;
+        for (let i = 0; i < 3; i++) {
+            await revealEmailButton.click();
+
+            email = await (await page.$x(
+                emailDivXpath + `/span/text()`
+            ))[0].evaluate(span => span.textContent.trim());
+
+            if (email[0] != "*") {
+                break;
+            }
+            await page.waitForTimeout(200);
+        }
+        if (!email || email[0] == "*") {
+            throw new Error(`Failed to read email from profile.`);
+        }
+
+        console.log("Email read as ", email);
+        
+        if (this.discordEmail) {
+            if (email != this.discordEmail) {
+                throw new Error(`Email in profile doesn't match provided email (${this.discordEmail}).`)
+            }
+        } else {
+            console.log("No email to verify against.")
+        }
+
+        // close settings
+        await page.keyboard.press('Escape');
+        await page.waitForTimeout(1000);
     }
 }
 
@@ -223,8 +267,8 @@ export class DiscordProject implements Project {
 
         this.initialTasks = [
             //new InitialDiscordTask(),
-            new LoginDiscordTask(discordEmail, discordPassword)
-            // TODO verify email task
+            new LoginDiscordTask(discordEmail, discordPassword),
+            new ProfileDiscordTask(discordEmail)
         ];
     }
 }
