@@ -124,7 +124,11 @@ export class Crawler {
             //ignoreDefaultArgs: ["--enable-automation"],
 
             headless: this.headless,
-            userDataDir: process.env.BROWSER_DATA_DIR || undefined
+            userDataDir: process.env.BROWSER_DATA_DIR || undefined,
+            env: {
+                ...process.env,
+                'TZ': 'Etc/UTC'
+            }
         });
         const page = await this.browser.newPage();
 

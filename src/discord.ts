@@ -4,6 +4,10 @@ import {Project, Task} from './crawl';
 
 const discord_url = new URL("https://discord.com/");
 
+function datetimeToDiscordSnowflake(date: Date) {
+    return (BigInt(date.getTime()) - BigInt("1420070400000") << BigInt(22)).toString();
+}
+
 export class DiscordTask extends Task {
 }
 
@@ -99,8 +103,6 @@ export class ChannelDiscordTask extends DiscordTask {
         await page.keyboard.press('KeyF');
         await page.keyboard.up('Control');
 
-        console.log("after: " + this.after)
-        console.log("before: " + this.before)
         if (this.after) {
             await page.keyboard.type('after:' + this.after, {delay: 100});
         }
@@ -108,22 +110,105 @@ export class ChannelDiscordTask extends DiscordTask {
             await page.keyboard.type('before:' + this.before, {delay: 100});
         }
 
-        await page.keyboard.press('Enter');
+        async function performAndWaitForSearchResults(action: Promise<void>) {
+            const resultsSelector = 'div[class^="totalResults"] > div:first-child';
+            await action;
+            await page.waitForSelector(resultsSelector);
 
-        await waitForAndClick(page, 
-            `div[aria-controls="oldest-tab"]`,
-            `"Oldest" tab in search didn't show up`
+            for (let i = 0; i < 10; i++) {
+                let resultsText = await page.$eval(resultsSelector, el => el.textContent);
+                if (resultsText.trim() != "Searching…") {
+                    return resultsText;
+                }
+
+                await page.waitForTimeout(1_000);
+                /*
+                await page.evaluate((selector: string) => {
+                    return new Promise<void>((resolve, reject) => {
+                        let observer = new MutationObserver(() => {
+                            observer.disconnect(); // use the mutation observer only once
+                            resolve();
+                        });
+                        observer.observe(document.querySelector(selector), { childList: true, subtree: true, });
+                
+                        setTimeout(reject.bind(this, 'timeout'), 10_000);
+                    });
+                }, resultsSelector);
+                */
+            }
+            throw Error("Did not get search results after 10 seconds.");
+        }
+
+        await performAndWaitForSearchResults(
+            page.keyboard.press('Enter')
+        );
+        
+        // Switch the order from oldest messages
+        let results_text = await performAndWaitForSearchResults(
+            page.click(`div[aria-controls="oldest-tab"]`)
         );
 
-        await page.waitForTimeout(500);
+        console.log("Search results: " + results_text);
 
-        await page.click(`div[aria-controls="oldest-tab"]`);
+        if (results_text == "No Results") {
+            // No search results match our criteria -- we're done scraping this channel
+            return;
+        }
 
-        console.log("Performed search");
+        const firstResultSelector = `#search-results > ul > li:first-of-type`;
+        let firstMessageId = await page.$eval(
+            firstResultSelector,
+            el => el.attributes['aria-labelledby'].value.split('-')[2]
+        );
 
-        await page.waitForTimeout(5000);
+        console.log(`ID of first message in search results: ${firstMessageId}`);
 
-        // TODO iterate over more messages
+        if (this.after) {
+            if (firstMessageId < datetimeToDiscordSnowflake(new Date(this.after))) {
+                throw Error("First message ID is less than the after date");
+            }
+        }
+
+        await page.click(firstResultSelector);
+        
+        // Wait for the message to show up
+        await page.waitForSelector(`#chat-messages-${firstMessageId}`);
+
+        // Close the search results
+        await page.click('[aria-label="Clear search"]');
+
+        // scroll down and stop until we either hit the bottom or a message
+        // that's after the after date
+
+        while (true) {
+            const lastMessageSelector = `ol[data-list-id="chat-messages"] > li[id^="chat-messages"]:last-of-type`;
+            let lastMessageId = await page.$eval(
+                lastMessageSelector,
+                el => el.attributes['id'].value.split('-')[2]
+            );
+
+            if (this.before) {
+                if (lastMessageId >= datetimeToDiscordSnowflake(new Date(this.before))) {
+                    console.log(`We have reached the last message we are interested in (ID ${lastMessageId})`);
+                    break;
+                }
+            }
+
+            if (!await page.$(`div[class^="jumpToPresentBar"`)) {
+                console.log(`We have reached the last message ("Jump to Present" bar is not present)`);
+                break;
+            }
+
+            console.log("Scrolling to last message...")
+            await page.$eval(lastMessageSelector,
+                el => el.scrollIntoView({ behavior: 'smooth', block: 'end'})
+            );
+            await page.waitForTimeout(1_000);
+        }
+
+        console.log(`Channel ${this.channelId} finished`);
+
+        //await page.waitForTimeout(15_000);
     }
 }
     
@@ -137,8 +222,9 @@ export class DiscordProject implements Project {
         }
 
         this.initialTasks = [
-            new InitialDiscordTask(),
+            //new InitialDiscordTask(),
             new LoginDiscordTask(discordEmail, discordPassword)
+            // TODO verify email task
         ];
     }
 }

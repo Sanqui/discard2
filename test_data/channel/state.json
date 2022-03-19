@@ -1,0 +1,23 @@
+{
+  "jobName": "2022-03-19T13:12:20.747Z-channel",
+  "jobMode": "channel",
+  "jobStarted": "2022-03-19T13:12:20.748Z",
+  "jobSaved": "2022-03-19T13:12:44.360Z",
+  "jobFinished": "2022-03-19T13:12:44.360Z",
+  "tasksFailed": [],
+  "currentTask": null,
+  "tasksQueued": [],
+  "tasksFinished": [
+    {
+      "discordEmail": "test_ahcae@protonmail.com",
+      "discordPassword": "9jVjMMp11QY1sMiJh87hDShqQ",
+      "type": "LoginDiscordTask"
+    },
+    {
+      "serverId": "954365197735317514",
+      "channelId": "954365197735317517",
+      "after": "2010-01-01",
+      "type": "ChannelDiscordTask"
+    }
+  ]
+}

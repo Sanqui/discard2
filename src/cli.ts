@@ -22,11 +22,11 @@ program
         new Option('-b, --browser-data-dir <path>', 'Browser data directory').env('BROWSER_DATA_DIR').makeOptionMandatory()
     );
 
-async function crawler(tasks: Task[]) {
+async function crawler(mode: string, tasks: Task[]) {
     const crawler = new Crawler({
         project: new DiscordProject(program.opts().email, program.opts().password),
         tasks: tasks,
-        mode: 'profile',
+        mode: mode,
         browserDataDir: program.opts().browserDataDir
     });
 
@@ -42,7 +42,7 @@ async function crawler(tasks: Task[]) {
 program.command('profile')
     .description('Log in and fetch profile information')
     .action( async () => {
-        crawler([new ProfileDiscordTask()])
+        crawler('profile', [new ProfileDiscordTask()])
     });
 
 program.command('channel')
@@ -52,7 +52,8 @@ program.command('channel')
     .option('--after <date>', 'Date after which to retrieve history')
     .option('--before <date>', 'Date before which to retrieve history')
     .action( async (serverId, channelId, options) => {
-        crawler([
+        crawler('channel',
+        [
             new ChannelDiscordTask(serverId, channelId, options.after, options.before)
         ])
     });

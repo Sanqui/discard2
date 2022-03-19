@@ -1,7 +1,10 @@
 import { spawn } from 'child_process';
 import * as fs from 'fs';
 
-const MITMDUMP_PATHS = ['mitmproxy/venv/bin/mitmdump', 'bin/mitmdump'];
+var tcpPortUsed = require('tcp-port-used');
+
+//const MITMDUMP_PATHS = ['mitmproxy/venv/bin/mitmdump', 'bin/mitmdump'];
+const MITMDUMP_PATHS = ['bin/mitmdump'];
 let mitmdumpPath: string = null;
 
 for (const path of MITMDUMP_PATHS) {
@@ -68,9 +71,10 @@ export class Mitmdump {
                 return;
             }
         }*/
-        // Quiet mitmdump produces no output, so just wait a second
+        // Quiet mitmdump produces no output, so wait
         // for it to pick itself up...
-        await new Promise(r => setTimeout(r, 1000));
+        await new tcpPortUsed.waitUntilUsed(8080, 500, 4000)
+        await new Promise(r => setTimeout(r, 2000));
     }
 
     async close() {
