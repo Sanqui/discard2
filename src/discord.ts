@@ -1,4 +1,6 @@
 import * as puppeteer_types from 'puppeteer';
+import dateFormat from "dateformat";
+
 import {retry, retryGoto, clickAndWaitForNavigation, getUrlsFromLinks, waitForAndClick} from './utils';
 import {Project, Task} from './crawl';
 
@@ -121,13 +123,23 @@ export class ProfileDiscordTask extends DiscordTask {
 
 export class ChannelDiscordTask extends DiscordTask {
     type = "ChannelDiscordTask";
+    serverId: string;
+    channelId: string;
+    after?: Date;
+    before?: Date;
+
     constructor(
-        public serverId: string,
-        public channelId: string,
-        public after?: string,
-        public before?: string,
+        serverId: string,
+        channelId: string,
+        after?: Date | string,
+        before?: Date | string,
     ) {
         super();
+        this.serverId = serverId;
+        this.channelId = channelId;
+
+        this.after = typeof after == "string" ? new Date(after) : after;
+        this.before = typeof before == "string" ? new Date(before) : before;
     }
 
     async perform(page: puppeteer_types.Page) {
@@ -147,12 +159,14 @@ export class ChannelDiscordTask extends DiscordTask {
         await page.keyboard.press('KeyF');
         await page.keyboard.up('Control');
 
-        if (this.after) {
-            await page.keyboard.type('after:' + this.after, {delay: 100});
+        async function typeDateFilter(name: string, date: Date) {
+            if (date) {
+                return await page.keyboard.type(name + ':' + dateFormat(date, "yyyy-mm-dd"), {delay: 100});
+            }
         }
-        if (this.before) {
-            await page.keyboard.type('before:' + this.before, {delay: 100});
-        }
+
+        await typeDateFilter('after', this.after);
+        await typeDateFilter('before', this.before);
 
         async function performAndWaitForSearchResults(action: Promise<void>) {
             const resultsSelector = 'div[class^="totalResults"] > div:first-child';
@@ -208,7 +222,7 @@ export class ChannelDiscordTask extends DiscordTask {
         console.log(`ID of first message in search results: ${firstMessageId}`);
 
         if (this.after) {
-            if (firstMessageId < datetimeToDiscordSnowflake(new Date(this.after))) {
+            if (firstMessageId < datetimeToDiscordSnowflake(this.after)) {
                 throw Error("First message ID is less than the after date");
             }
         }
@@ -224,6 +238,8 @@ export class ChannelDiscordTask extends DiscordTask {
         // scroll down and stop until we either hit the bottom or a message
         // that's after the after date
 
+        let scrollTimes = 0;
+
         while (true) {
             const lastMessageSelector = `ol[data-list-id="chat-messages"] > li[id^="chat-messages"]:last-of-type`;
             let lastMessageId = await page.$eval(
@@ -232,7 +248,7 @@ export class ChannelDiscordTask extends DiscordTask {
             );
 
             if (this.before) {
-                if (lastMessageId >= datetimeToDiscordSnowflake(new Date(this.before))) {
+                if (lastMessageId >= datetimeToDiscordSnowflake(this.before)) {
                     console.log(`We have reached the last message we are interested in (ID ${lastMessageId})`);
                     break;
                 }
@@ -243,14 +259,15 @@ export class ChannelDiscordTask extends DiscordTask {
                 break;
             }
 
-            console.log("Scrolling to last message...")
+            console.log(`Scrolling to last message (ID ${lastMessageId})...`)
             await page.$eval(lastMessageSelector,
                 el => el.scrollIntoView({ behavior: 'smooth', block: 'end'})
             );
             await page.waitForTimeout(1_000);
+            scrollTimes += 1;
         }
 
-        console.log(`Channel ${this.channelId} finished`);
+        console.log(`Channel ${this.channelId} finished (scolled ${scrollTimes} times)`);
 
         //await page.waitForTimeout(15_000);
     }

@@ -1,6 +1,7 @@
 {
   "dependencies": {
     "commander": "^9.0.0",
+    "dateformat": "^4.6.3",
     "dotenv": "^16.0.0",
     "press-any-key": "^0.1.1",
     "puppeteer": "^13.5.1",
@@ -9,6 +10,7 @@
     "tcp-port-used": "^1.0.2"
   },
   "devDependencies": {
+    "@types/dateformat": "^5.0.0",
     "@types/jest": "^27.4.1",
     "jest": "^27.5.1",
     "ts-jest": "^27.1.3",
