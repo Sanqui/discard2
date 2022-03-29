@@ -64,14 +64,14 @@ export class LoginDiscordTask extends DiscordTask {
 }
 
 export class ProfileDiscordTask extends DiscordTask {
+    type = "ProfileDiscordTask";
     constructor(
         public discordEmail?: string,
     ) {
         super();
     }
 
-    type = "ProfileDiscordTask";
-    async perform(page: puppeteer_types.Page) {
+    async _openSettings(page: puppeteer_types.Page) {
         await retry(
             async () => {
                 await page.click('button[aria-label="User Settings"]')
@@ -81,7 +81,14 @@ export class ProfileDiscordTask extends DiscordTask {
             "opening user settings"
         )
         await page.waitForSelector('#my-account-tab')
+    }
 
+    async _closeSettings(page: puppeteer_types.Page) {
+        await page.keyboard.press('Escape');
+        await page.waitForTimeout(1000);
+    }
+
+    async _getEmail(page: puppeteer_types.Page): Promise<string> {
         const emailDivXpath = `//*[@id="my-account-tab"]//h5[contains(., 'Email')]/following-sibling::div[1]`;
 
         const [revealEmailButton] = await page.$x(
@@ -105,6 +112,13 @@ export class ProfileDiscordTask extends DiscordTask {
             throw new Error(`Failed to read email from profile.`);
         }
 
+        return email;
+    }
+
+    async perform(page: puppeteer_types.Page) {
+        await this._openSettings(page);
+
+        const email = await this._getEmail(page);
         console.log("Email read as ", email);
         
         if (this.discordEmail) {
@@ -115,9 +129,7 @@ export class ProfileDiscordTask extends DiscordTask {
             console.log("No email to verify against.")
         }
 
-        // close settings
-        await page.keyboard.press('Escape');
-        await page.waitForTimeout(1000);
+        await this._closeSettings(page);
     }
 }
 
@@ -142,7 +154,7 @@ export class ChannelDiscordTask extends DiscordTask {
         this.before = typeof before == "string" ? new Date(before) : before;
     }
 
-    async perform(page: puppeteer_types.Page) {
+    async _openChannel(page: puppeteer_types.Page) {
         await waitForAndClick(page, 
             `[data-list-item-id=guildsnav___${this.serverId}]`,
             `Server ID ${this.serverId} not found`
@@ -154,7 +166,9 @@ export class ChannelDiscordTask extends DiscordTask {
         );
 
         console.log(`Channel ${this.channelId} opened`)
+    }
 
+    async _searchAndClickFirstResult(page: puppeteer_types.Page): Promise<string | void> {
         await page.keyboard.down('Control');
         await page.keyboard.press('KeyF');
         await page.keyboard.up('Control');
@@ -180,19 +194,6 @@ export class ChannelDiscordTask extends DiscordTask {
                 }
 
                 await page.waitForTimeout(1_000);
-                /*
-                await page.evaluate((selector: string) => {
-                    return new Promise<void>((resolve, reject) => {
-                        let observer = new MutationObserver(() => {
-                            observer.disconnect(); // use the mutation observer only once
-                            resolve();
-                        });
-                        observer.observe(document.querySelector(selector), { childList: true, subtree: true, });
-                
-                        setTimeout(reject.bind(this, 'timeout'), 10_000);
-                    });
-                }, resultsSelector);
-                */
             }
             throw Error("Did not get search results after 10 seconds.");
         }
@@ -235,6 +236,10 @@ export class ChannelDiscordTask extends DiscordTask {
         // Close the search results
         await page.click('[aria-label="Clear search"]');
 
+        return firstMessageId;
+    }
+
+    async _scrollChat(page: puppeteer_types.Page) {
         // scroll down and stop until we either hit the bottom or a message
         // that's after the after date
 
@@ -268,6 +273,16 @@ export class ChannelDiscordTask extends DiscordTask {
         }
 
         console.log(`Channel ${this.channelId} finished (scolled ${scrollTimes} times)`);
+    }
+
+    async perform(page: puppeteer_types.Page) {
+        await this._openChannel(page);
+
+        const firstMessageId = await this._searchAndClickFirstResult(page);
+
+        if (!firstMessageId) return;
+
+        await this._scrollChat(page);
 
         //await page.waitForTimeout(15_000);
     }
