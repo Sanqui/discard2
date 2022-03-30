@@ -5,7 +5,8 @@ import * as puppeteer_types from 'puppeteer';
 import puppeteer from 'puppeteer-extra'
 import StealthPlugin from 'puppeteer-extra-plugin-stealth'
 
-import { Mitmdump } from './mitmdump';
+import { CaptureTool } from './captureTools/captureTools';
+//import { Mitmdump } from './captureTools/mitmdump';
 
 puppeteer.use(StealthPlugin());
 
@@ -39,6 +40,7 @@ interface CrawlerParams {
     browserDataDir?: string,
     serverSideReplayFile?: string,
     headless?: boolean,
+    captureTool: typeof CaptureTool
 }
 
 export class Crawler {
@@ -48,7 +50,7 @@ export class Crawler {
     state: State;
     project: Project;
     dataPath: string;
-    mitmdump: Mitmdump;
+    captureTool: CaptureTool;
     startMitmdump: boolean = true;
     headless: boolean;
     tasks: Task[];
@@ -62,9 +64,9 @@ export class Crawler {
         this.jobName = new Date().toISOString() + '-' + params.mode;
         this.dataPath = (params.outputDir || 'out') + `/${this.jobName}`;
         if (!params.serverSideReplayFile) {
-            this.mitmdump = new Mitmdump(this.dataPath + '/mitmdump');
+            this.captureTool = new params.captureTool(this.dataPath + '/mitmdump');
         } else {
-            this.mitmdump = new Mitmdump(params.serverSideReplayFile, true);
+            this.captureTool= new params.captureTool(params.serverSideReplayFile, true);
         }
         this.headless = params.headless || false;
     }
@@ -107,9 +109,7 @@ export class Crawler {
             await fs.mkdir(this.dataPath, { recursive: true });
         }
 
-        if (this.startMitmdump) {
-            await this.mitmdump.start()
-        }
+        await this.captureTool.start()
 
         // Check if we're running in Docker.
         // If yes, we'll need to pass the `--no-sandbox` flag.
@@ -122,7 +122,7 @@ export class Crawler {
 
         this.browser = await puppeteer.launch({
             args: [
-                '--proxy-server=127.0.0.1:8080',
+                this.captureTool.proxyServerAddress ? `--proxy-server=${this.captureTool.proxyServerAddress}` : '',
                 '--ignore-certificate-errors',
                 '--disable-gpu',
                 '--force-prefers-reduced-motion',
@@ -172,9 +172,7 @@ export class Crawler {
         this.saveState();
 
         await this.browser.close();
-        if (this.startMitmdump) {
-            await this.mitmdump.close();
-        }
+        await this.captureTool.close();
     }
 }
 

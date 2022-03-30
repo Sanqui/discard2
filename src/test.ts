@@ -2,7 +2,8 @@ import * as fs from 'fs/promises';
 
 import { Crawler } from './crawl';
 import { DiscordProject, ProfileDiscordTask, ChannelDiscordTask } from './discord';
-import { Mitmdump } from './mitmdump';
+import { DummyCaptureTool } from './captureTools/captureTools';
+import { Mitmdump } from './captureTools/mitmdump';
 
 const TEST_DISCORD_EMAIL = "test_ahcae@protonmail.com";
 const TEST_DISCORD_PASSWORD = "9jVjMMp11QY1sMiJh87hDShqQ";
@@ -25,6 +26,7 @@ test('initializes a crawler', async () => {
         tasks: [],
         mode: 'none',
         outputDir: await fs.mkdtemp("/tmp/discard2-test-"),
+        captureTool: DummyCaptureTool,
         headless: true,
     });
     expect(crawler).toBeTruthy();
@@ -37,6 +39,7 @@ test('runs a profile job against a replay', async () => {
         mode: 'profile',
         outputDir: await fs.mkdtemp("/tmp/discard2-test-"),
         serverSideReplayFile: './test_data/profile/mitmdump',
+        captureTool: Mitmdump,
         headless: true,
     });
 
@@ -56,6 +59,7 @@ test('runs a channel job against a replay', async () => {
         mode: 'channel',
         outputDir: await fs.mkdtemp("/tmp/discard2-test-"),
         serverSideReplayFile: './test_data/channel/mitmdump',
+        captureTool: Mitmdump,
         headless: true,
     });
 

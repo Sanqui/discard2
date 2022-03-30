@@ -4,6 +4,13 @@ import { Command, Option } from 'commander';
 
 import { Crawler, Task } from './crawl';
 import { DiscordProject, ProfileDiscordTask, ChannelDiscordTask } from './discord';
+import { DummyCaptureTool } from './captureTools/captureTools';
+import { Mitmdump } from './captureTools/mitmdump';
+
+const captureTools = {
+    "none": DummyCaptureTool,
+    "mitmdump": Mitmdump
+}
 
 dotenv.config();
 
@@ -20,14 +27,21 @@ program
     )
     .addOption(
         new Option('-b, --browser-data-dir <path>', 'Browser data directory').env('BROWSER_DATA_DIR').makeOptionMandatory()
-    );
+    )
+    .addOption(
+        new Option('-c, --capture-tool <tool>', 'Capture tool')
+            .choices(['none', 'mitmdump', 'tshark'])
+            .env('CAPTURE_TOOL').makeOptionMandatory()
+    )
+;
 
 async function crawler(mode: string, tasks: Task[]) {
     const crawler = new Crawler({
         project: new DiscordProject(program.opts().email, program.opts().password),
         tasks: tasks,
         mode: mode,
-        browserDataDir: program.opts().browserDataDir
+        browserDataDir: program.opts().browserDataDir,
+        captureTool: captureTools[program.opts().captureTool],
     });
 
     try {

@@ -1,35 +1,49 @@
 import { spawn } from 'child_process';
 import * as fs from 'fs';
 
+import { CaptureTool } from './captureTools';
+
 var tcpPortUsed = require('tcp-port-used');
 
 //const MITMDUMP_PATHS = ['mitmproxy/venv/bin/mitmdump', 'bin/mitmdump'];
 const MITMDUMP_PATHS = ['bin/mitmdump'];
-let mitmdumpPath: string = null;
 
-for (const path of MITMDUMP_PATHS) {
-    if (fs.existsSync(path)) {
-        mitmdumpPath = path;
-        break;
+function findMitmdump() {
+    let mitmdumpPath: string = null;
+
+    for (const path of MITMDUMP_PATHS) {
+        if (fs.existsSync(path)) {
+            mitmdumpPath = path;
+            break;
+        }
     }
+
+    if (!mitmdumpPath) {
+        throw new Error('Could not find mitmdump');
+    }
+
+    console.log(`Using mitmdump at ${mitmdumpPath}`);
+
+    return mitmdumpPath;
 }
 
-if (!mitmdumpPath) {
-    throw new Error('Could not find mitmdump');
-}
+export class Mitmdump extends CaptureTool {
+    supportsReplay = true;
+    proxyServerAddress = "127.0.0.1:8080";
 
-console.log(`Using mitmdump at ${mitmdumpPath}`);
-
-export class Mitmdump {
     process: any;
     filePath: string;
     replay: boolean;
     closed: boolean;
+    mitmdumpPath: string;
 
     constructor(filePath: string, replay?: boolean) {
+        super(filePath, replay);
+        
         this.filePath = filePath;
         this.replay = replay || false;
         this.closed = true;
+        this.mitmdumpPath = findMitmdump();
     }
 
     async start() {
@@ -52,7 +66,7 @@ export class Mitmdump {
             }
         );
 
-        this.process = spawn(mitmdumpPath, args).on('exit', code => {
+        this.process = spawn(this.mitmdumpPath, args).on('exit', code => {
             if (code != 0) {
                 throw new Error(`mitmdump exited with code ${code}`);
             }
