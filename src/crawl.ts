@@ -111,12 +111,22 @@ export class Crawler {
             await this.mitmdump.start()
         }
 
+        // Check if we're running in Docker.
+        // If yes, we'll need to pass the `--no-sandbox` flag.
+        // This is not necessary in Podman.
+        let runningInDocker = false;
+        try {
+            await fs.readFile("/.dockerenv");
+            runningInDocker = true;
+        } catch {}
+
         this.browser = await puppeteer.launch({
             args: [
                 '--proxy-server=127.0.0.1:8080',
                 '--ignore-certificate-errors',
                 '--disable-gpu',
                 '--force-prefers-reduced-motion',
+                runningInDocker ? '--no-sandbox' : '',
             //    `--ssl-key-log-file=${this.dataPath}/sslkeys.pms`
             ],
             // Remove "Chrome is being controlled by automated test software" banner,

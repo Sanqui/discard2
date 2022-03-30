@@ -7,19 +7,9 @@ jobs:
 
     runs-on: ubuntu-latest
 
-    strategy:
-      matrix:
-        node-version: [16.x]
-        # See supported Node.js release schedule at https://nodejs.org/en/about/releases/
-
     steps:
     - uses: actions/checkout@v2
-    - name: Use Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v2
-      with:
-        node-version: ${{ matrix.node-version }}
-        cache: 'npm'
-    - run: mkdir bin && cd bin && wget -q https://snapshots.mitmproxy.org/7.0.4/mitmproxy-7.0.4-linux.tar.gz -O mitmproxy.tar.gz && tar xf mitmproxy.tar.gz && cd -
-    - run: npm ci --include=dev
-    - run: npm run build --if-present
-    - run: npm run test
+    - name: setup-docker
+      uses: docker-practice/actions-setup-docker@1.0.9
+    - run: docker build -f Containerfile -t discard2-test --target test .
+    - run: docker run discard2-test
