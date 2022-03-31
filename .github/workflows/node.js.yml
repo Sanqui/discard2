@@ -12,4 +12,4 @@ jobs:
     - name: setup-docker
       uses: docker-practice/actions-setup-docker@1.0.9
     - run: docker build -f Containerfile -t discard2-test --target test .
-    - run: docker run discard2-test
+    - run: docker run --cap-add=NET_RAW --cap-add=NET_ADMIN discard2-test

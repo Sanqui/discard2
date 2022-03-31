@@ -42,16 +42,24 @@ export class Tshark extends CaptureTool {
             '-f', 'not (src 127.0.0.1 and dst 127.0.0.1)',
         ];
         this.process = spawn('tshark', args).on('exit', code => {
-            if (code != 0) {
+            if (code != 0 && code != 255) {
                 console.log("tshark stderr: " + this.stderr);
                 throw new Error(`tshark exited with code ${code}`);
             }
         });
 
         for await (const chunk of this.process.stderr) {
+            //console.log("tshark stderr: " + chunk);
             this.stderr += chunk.toString();
-            if (this.stderr.includes("Capture started.")) {
+            //if (this.stderr.includes("Capture started.")) {
+            if (this.stderr.includes("Capturing on '")) {
                 console.log("tshark started");
+                this.stderr = "";
+
+                this.process.stderr.on('data', data => {
+                    this.stderr += data.toString();
+                    //console.log("tshark stderr: ", data.toString());
+                });
                 return;
             }
         }

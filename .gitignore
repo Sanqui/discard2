@@ -4,6 +4,7 @@ warcprox/
 *.js
 !jest.config.js
 out/
+out2/
 .env
 bin/
 mitmproxy/

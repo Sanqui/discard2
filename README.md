@@ -15,7 +15,8 @@ Docker:
 
 ```bash
 docker build -f Containerfile -t discard2 --target run .
-docker run --env-file=.env -v $PWD/out:/app/out:Z,U discard2 -- -c tshark --headless profile
+docker run --env-file=.env -v $PWD/out:/app/out:Z,U --cap-add=NET_RAW --cap-add=NET_ADMIN 
+    discard2 -- -c tshark --headless profile
 ```
 
 To use the `tshark` capture tool without Docker, you need to add your user to the wireshark group:

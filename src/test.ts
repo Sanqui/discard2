@@ -4,6 +4,7 @@ import { Crawler } from './crawl';
 import { DiscordProject, ProfileDiscordTask, ChannelDiscordTask } from './discord';
 import { DummyCaptureTool } from './captureTools/captureTools';
 import { Mitmdump } from './captureTools/mitmdump';
+import { Tshark } from './captureTools/tshark';
 
 const TEST_DISCORD_EMAIL = "test_ahcae@protonmail.com";
 const TEST_DISCORD_PASSWORD = "9jVjMMp11QY1sMiJh87hDShqQ";
@@ -18,6 +19,12 @@ test('restarts mitmdump twice', async () => {
     let mitmdump2 = new Mitmdump((await fs.mkdtemp("/tmp/discard2-test-")));
     await mitmdump2.start();
     await mitmdump2.close();
+});
+
+test('starts and closes tshark', async () => {
+    let tshark = new Tshark((await fs.mkdtemp("/tmp/discard2-test-")));
+    await tshark.start();
+    await tshark.close();
 });
 
 test('initializes a crawler', async () => {
