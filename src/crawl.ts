@@ -155,7 +155,15 @@ export class Crawler {
 
             console.log(`*** Task: ${task.constructor.name} (${this.state.tasksQueued.length} more)`);
 
-            let newTasks = await task.perform(page);
+            let newTasks: Task[] | void;
+            try {
+                newTasks = await task.perform(page);
+            } catch (error) {
+                console.log("Caught error while performing task: " + error);
+                await this.browser.close();
+                await this.captureTool.close();
+                throw error;
+            }
             if (newTasks) {
                 this.state.tasksQueued = [
                     ...newTasks,

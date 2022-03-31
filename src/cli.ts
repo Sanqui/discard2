@@ -33,6 +33,7 @@ program
             .choices(['none', 'mitmdump', 'tshark'])
             .env('CAPTURE_TOOL').makeOptionMandatory()
     )
+    .option('--headless', 'Run in headless mode')
 ;
 
 async function crawler(mode: string, tasks: Task[]) {
@@ -42,6 +43,7 @@ async function crawler(mode: string, tasks: Task[]) {
         mode: mode,
         browserDataDir: program.opts().browserDataDir,
         captureTool: captureTools[program.opts().captureTool],
+        headless: program.opts().headless,
     });
 
     try {
