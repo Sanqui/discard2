@@ -1,9 +1,9 @@
 import { spawn } from 'child_process';
 import * as fs from 'fs';
 
-import { CaptureTool } from './captureTools';
-
 var tcpPortUsed = require('tcp-port-used');
+
+import { CaptureTool } from './captureTools';
 
 //const MITMDUMP_PATHS = ['mitmproxy/venv/bin/mitmdump', 'bin/mitmdump'];
 const MITMDUMP_PATHS = ['bin/mitmdump'];
@@ -37,10 +37,10 @@ export class Mitmdump extends CaptureTool {
     closed: boolean;
     mitmdumpPath: string;
 
-    constructor(filePath: string, replay?: boolean) {
-        super(filePath, replay);
+    constructor(dataPath: string, replay?: boolean) {
+        super(dataPath, replay);
         
-        this.filePath = filePath;
+        this.filePath = dataPath + '/capture.mitmdump';
         this.replay = replay || false;
         this.closed = true;
         this.mitmdumpPath = findMitmdump();

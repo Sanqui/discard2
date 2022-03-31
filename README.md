@@ -15,8 +15,16 @@ Docker:
 
 ```bash
 docker build -f Containerfile -t discard2 --target run .
-docker run --env-file=.env -v $PWD/out:/app/out:rw discard2 -- -c none --headless profile
+docker run --env-file=.env -v $PWD/out:/app/out:Z,U discard2 -- -c tshark --headless profile
 ```
+
+To use the `tshark` capture tool without Docker, you need to add your user to the wireshark group:
+
+```bash
+sudo usermod -a -G wireshark [your_username]
+```
+
+**Warning!**  When you choose the `tshark` capture tool outside of Docker, **all traffic** on your system gets saved.  Only use this capture without Docker for testing purposes, never publish them.
 
 ## Run tests
 
@@ -24,9 +32,3 @@ docker run --env-file=.env -v $PWD/out:/app/out:rw discard2 -- -c none --headles
 docker build -f Containerfile -t discard2-test --target test .
 docker run discard2-test
 ```
-
-## Troubleshooting
-
-`Caught error: EACCES: permission denied, mkdir 'out/2022-03-31T11:51:26.131Z-profile'`
-
-Since the Docker container uses an unpriviledged user to run node, the permissions on the output directory must be more lenient, e.g. `chmod -R 777 out/`.

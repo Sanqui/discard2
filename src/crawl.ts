@@ -22,10 +22,11 @@ export type State = {
     jobStarted: Date,
     jobSaved: Date | null,
     jobFinished: Date | null,
+    captureToolName: string,
     tasksQueued: Task[],
     currentTask: Task | null,
     tasksFinished: Task[],
-    tasksFailed: Task[]
+    tasksFailed: Task[],
 }
 
 export interface Project {
@@ -64,7 +65,7 @@ export class Crawler {
         this.jobName = new Date().toISOString() + '-' + params.mode;
         this.dataPath = (params.outputDir || 'out') + `/${this.jobName}`;
         if (!params.serverSideReplayFile) {
-            this.captureTool = new params.captureTool(this.dataPath + '/mitmdump');
+            this.captureTool = new params.captureTool(this.dataPath);
         } else {
             this.captureTool= new params.captureTool(params.serverSideReplayFile, true);
         }
@@ -99,6 +100,7 @@ export class Crawler {
                 jobStarted: new Date(),
                 jobSaved: null,
                 jobFinished: null,
+                captureToolName: this.captureTool.constructor.name,
                 tasksFailed: [],
                 currentTask: null,
                 tasksQueued: [],
@@ -127,7 +129,9 @@ export class Crawler {
                 '--disable-gpu',
                 '--force-prefers-reduced-motion',
                 runningInDocker ? '--no-sandbox' : '',
-            //    `--ssl-key-log-file=${this.dataPath}/sslkeys.pms`
+                `--ssl-key-log-file=${this.dataPath}/sslkeys.pms`,
+                // Wireshark and other tools can't yet decrypt QUIC yet
+                '--disable-quic'
             ],
             // Remove "Chrome is being controlled by automated test software" banner,
             // but brings some caveats

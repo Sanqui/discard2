@@ -11,11 +11,11 @@ const TEST_DISCORD_PASSWORD = "9jVjMMp11QY1sMiJh87hDShqQ";
 jest.setTimeout(45_000);
 
 test('restarts mitmdump twice', async () => {
-    let mitmdump = new Mitmdump((await fs.mkdtemp("/tmp/discard2-test-")) + "/mitmdump");
+    let mitmdump = new Mitmdump((await fs.mkdtemp("/tmp/discard2-test-")));
     await mitmdump.start();
     await mitmdump.close();
 
-    let mitmdump2 = new Mitmdump((await fs.mkdtemp("/tmp/discard2-test-")) + "/mitmdump");
+    let mitmdump2 = new Mitmdump((await fs.mkdtemp("/tmp/discard2-test-")));
     await mitmdump2.start();
     await mitmdump2.close();
 });
@@ -38,7 +38,7 @@ test('runs a profile job against a replay', async () => {
         tasks: [],
         mode: 'profile',
         outputDir: await fs.mkdtemp("/tmp/discard2-test-"),
-        serverSideReplayFile: './test_data/profile/mitmdump',
+        serverSideReplayFile: './test_data/profile/',
         captureTool: Mitmdump,
         headless: true,
     });
@@ -58,7 +58,7 @@ test('runs a channel job against a replay', async () => {
         ],
         mode: 'channel',
         outputDir: await fs.mkdtemp("/tmp/discard2-test-"),
-        serverSideReplayFile: './test_data/channel/mitmdump',
+        serverSideReplayFile: './test_data/channel/',
         captureTool: Mitmdump,
         headless: true,
     });

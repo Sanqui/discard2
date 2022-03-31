@@ -6,10 +6,12 @@ import { Crawler, Task } from './crawl';
 import { DiscordProject, ProfileDiscordTask, ChannelDiscordTask } from './discord';
 import { DummyCaptureTool } from './captureTools/captureTools';
 import { Mitmdump } from './captureTools/mitmdump';
+import { Tshark } from './captureTools/tshark';
 
 const captureTools = {
     "none": DummyCaptureTool,
-    "mitmdump": Mitmdump
+    "mitmdump": Mitmdump,
+    "tshark": Tshark
 }
 
 dotenv.config();

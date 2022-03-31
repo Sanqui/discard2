@@ -34,6 +34,8 @@ export class LoginDiscordTask extends DiscordTask {
 
         await page.waitForSelector("#app-mount")
 
+        await page.bringToFront();
+
         let this_ = this;
         async function fillInLoginForm() {
             console.log("Filling in login form")

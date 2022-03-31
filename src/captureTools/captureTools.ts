@@ -3,7 +3,7 @@ export class CaptureTool {
     supportsReplay: boolean;
     proxyServerAddress: string | null;
 
-    constructor(filePath: string, replay?: boolean) {};
+    constructor(dataPath: string, replay?: boolean) {};
     async start(): Promise<void> {};
     async close(): Promise<void> {};
 }
@@ -12,8 +12,8 @@ export class DummyCaptureTool extends CaptureTool {
     supportsReplay = false;
     proxyServerAddress = null;
 
-    constructor(filePath: string, replay?: boolean){
-        super(filePath, replay);
+    constructor(dataPath: string, replay?: boolean){
+        super(dataPath, replay);
         if (replay && !this.supportsReplay) {
             throw new Error(`Capture tool ${this.constructor.name} does not support replay`);
         }
