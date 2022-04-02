@@ -4,6 +4,7 @@ import { Command, Option } from 'commander';
 
 import { Crawler, Task } from './crawl';
 import { DiscordProject, ProfileDiscordTask, ChannelDiscordTask } from './discord';
+import { read } from './reader';
 import { DummyCaptureTool } from './captureTools/captureTools';
 import { Mitmdump } from './captureTools/mitmdump';
 import { Tshark } from './captureTools/tshark';
@@ -21,31 +22,36 @@ const program = new Command();
 program
     .name('discard2')
     .description('Discord archival tool')
-    .addOption(
-        new Option('-e, --email <email>', 'Discord account email').env('DISCORD_EMAIL').makeOptionMandatory()
-    )
-    .addOption(
-        new Option('-p, --password <password>', 'Discord account password').env('DISCORD_PASSWORD').makeOptionMandatory()
-    )
-    .addOption(
-        new Option('-b, --browser-data-dir <path>', 'Browser data directory').env('BROWSER_DATA_DIR').makeOptionMandatory()
-    )
-    .addOption(
-        new Option('-c, --capture-tool <tool>', 'Capture tool')
-            .choices(['none', 'mitmdump', 'tshark'])
-            .env('CAPTURE_TOOL').makeOptionMandatory()
-    )
-    .option('--headless', 'Run in headless mode')
 ;
 
-async function crawler(mode: string, tasks: Task[]) {
+function addCommonOptions(command: Command) {
+    return command
+        .addOption(
+            new Option('-e, --email <email>', 'Discord account email').env('DISCORD_EMAIL').makeOptionMandatory()
+        )
+        .addOption(
+            new Option('-p, --password <password>', 'Discord account password').env('DISCORD_PASSWORD').makeOptionMandatory()
+        )
+        .addOption(
+            new Option('-b, --browser-data-dir <path>', 'Browser data directory').env('BROWSER_DATA_DIR').makeOptionMandatory()
+        )
+        .addOption(
+            new Option('-c, --capture-tool <tool>', 'Capture tool')
+                .choices(['none', 'mitmdump', 'tshark'])
+                .env('CAPTURE_TOOL').makeOptionMandatory()
+        )
+        .option('--headless', 'Run in headless mode')
+    ;
+}
+
+async function crawler(opts, mode: string, tasks: Task[]) {
     const crawler = new Crawler({
-        project: new DiscordProject(program.opts().email, program.opts().password),
+        project: new DiscordProject(opts.email, opts.password),
         tasks: tasks,
         mode: mode,
-        browserDataDir: program.opts().browserDataDir,
-        captureTool: captureTools[program.opts().captureTool],
-        headless: program.opts().headless,
+        browserDataDir: opts.browserDataDir,
+        captureTool: captureTools[opts.captureTool],
+        headless: opts.headless,
     });
 
     try {
@@ -57,23 +63,33 @@ async function crawler(mode: string, tasks: Task[]) {
     }
 }
 
-program.command('profile')
-    .description('Log in and fetch profile information')
-    .action( async () => {
-        crawler('profile', [])
-    });
 
-program.command('channel')
+addCommonOptions(program.command('profile'))
+    .description('Log in and fetch profile information')
+    .action( async (opts) => {
+        crawler(opts, 'profile', [])
+    })
+
+
+addCommonOptions(program.command('channel'))
     .description('Scrape a single channel')
     .argument('<server-id>', 'Server ID')
     .argument('<channel-id>', 'Channel ID')
     .option('--after <date>', 'Date after which to retrieve history')
     .option('--before <date>', 'Date before which to retrieve history')
-    .action( async (serverId, channelId, options) => {
-        crawler('channel',
+    .action( async (serverId, channelId, opts) => {
+        crawler(opts, 'channel',
         [
-            new ChannelDiscordTask(serverId, channelId, options.after, options.before)
+            new ChannelDiscordTask(serverId, channelId, opts.after, opts.before)
         ])
     });
+
+
+program.command('reader')
+    .description('Read completed job')
+    .argument('<job-path>', 'Path to job directory')
+    .action( async (jobPath, opts) => {
+        read(jobPath);
+    })
 
 program.parse();

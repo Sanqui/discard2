@@ -1,5 +1,7 @@
 {
   "dependencies": {
+    "@types/split2": "^3.2.1",
+    "@types/stream-json": "^1.7.2",
     "commander": "^9.0.0",
     "dateformat": "^4.6.3",
     "dotenv": "^16.0.0",
@@ -7,6 +9,8 @@
     "puppeteer": "^13.5.1",
     "puppeteer-extra": "^3.2.3",
     "puppeteer-extra-plugin-stealth": "^2.9.0",
+    "split2": "^4.1.0",
+    "stream-json": "^1.7.4",
     "tcp-port-used": "^1.0.2"
   },
   "devDependencies": {
