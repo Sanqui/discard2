@@ -4,7 +4,7 @@ import { Command, Option } from 'commander';
 
 import { Crawler, Task } from './crawl';
 import { DiscordProject, ProfileDiscordTask, ChannelDiscordTask } from './discord';
-import { read } from './reader';
+import { Reader } from './reader/reader';
 import { DummyCaptureTool } from './captureTools/captureTools';
 import { Mitmdump } from './captureTools/mitmdump';
 import { Tshark } from './captureTools/tshark';
@@ -88,8 +88,14 @@ addCommonOptions(program.command('channel'))
 program.command('reader')
     .description('Read completed job')
     .argument('<job-path>', 'Path to job directory')
+    .addOption(
+        new Option('-f, --format <format>', 'Output format')
+            .choices(['print', 'jsonl'])
+    )
+    .option('--verbose', 'Be verbose')
     .action( async (jobPath, opts) => {
-        read(jobPath);
+        let reader = new Reader(jobPath, opts.verbose, opts.format);
+        reader.read();
     })
 
 program.parse();

@@ -27,6 +27,13 @@ sudo usermod -a -G wireshark [your_username]
 
 **Warning!**  When you choose the `tshark` capture tool outside of Docker, **all traffic** on your system gets saved.  Only use this capture without Docker for testing purposes, never publish them.
 
+## Processing
+
+To convert captures into JSONL suitable for further processing, use:
+```bash
+npm run --silent start -- reader -f jsonl [job_directory] > out.jsonl
+```
+
 ## Run tests
 
 ```bash
