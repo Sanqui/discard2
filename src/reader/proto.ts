@@ -5,11 +5,7 @@ import { Buffer } from 'buffer';
 
 import brotli from 'brotli';
 import { gzip, ungzip } from 'node-gzip';
-// Note: We have to use pako 1.x, the same version Discord
-// uses, because later versions has different Z_SYNC_FLUSH
-// handling https://github.com/nodeca/pako/issues/196
-import pako from 'pako';
-// XXX another option would be https://www.npmjs.com/package/zlib-sync
+var ZlibSync = require("zlib-sync");
 
 const CLIENT_IP = '10.0.2.100';
 
@@ -49,19 +45,23 @@ function hexToBuffer(hex: string): Buffer {
 export class ProtocolHandler {
     httpStreams: {[key: number]: HTTP2Stream} = {};
     discordWsStreamPort: number;
-    discordWsStreamInflator: pako.Inflate;
+    discordWsStreamInflator: any;
 
     constructor(
         public log: Function,
         public output: Function
     ) {}
 
-    async handleWebsocketPayload(isRequest: boolean, buffer: Buffer, timestamp: string) {
+    async handleWebsocketPayload(isRequest: boolean,
+            buffer: Buffer,
+            timestamp: string,
+            flush: boolean = true
+    ) {
         let data: string;
         if (isRequest) {
             data = buffer.toString('utf-8');
         } else {
-            this.discordWsStreamInflator.push(Uint8Array.from(buffer), true);
+            this.discordWsStreamInflator.push(Uint8Array.from(buffer), flush ? ZlibSync.Z_SYNC_FLUSH : null);
             if (this.discordWsStreamInflator.result) {
                 data = this.discordWsStreamInflator.result.toString();
             }
@@ -171,9 +171,7 @@ export class ProtocolHandler {
     
             this.discordWsStreamPort = layers.tcp['tcp.dstport'];
     
-            this.discordWsStreamInflator = new pako.Inflate({
-                chunkSize: 65536,
-                to: "string"});
+            this.discordWsStreamInflator = new ZlibSync.Inflate();
     
             // There's a first websocket packet following the 101 HTTP request
             // which Wireshark fails to recognize, but we need the data
