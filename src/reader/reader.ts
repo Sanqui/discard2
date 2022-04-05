@@ -5,7 +5,7 @@ import * as fs from 'fs/promises';
 import { parser } from 'stream-json';
 import { streamArray } from 'stream-json/streamers/StreamArray';
 
-import { ProtocolHandler } from './proto';
+import { ProtocolHandler, ReaderOutput } from './proto';
 
 enum OutputFormats {
     PRINT = 'print',
@@ -25,7 +25,7 @@ export class Reader {
         }
     }
 
-    async output(data: any) {
+    async output(data: ReaderOutput) {
         if (this.outputFormat == OutputFormats.JSONL) {
             console.log(JSON.stringify(data));
         }

@@ -7,6 +7,29 @@ import brotli from 'brotli';
 import { gzip, ungzip } from 'node-gzip';
 var ZlibSync = require("zlib-sync");
 
+export interface ReaderOutputHttp {
+    type: "http",
+    timestamp_start: string,
+    timestamp_end: string,
+    request: {
+        method: string,
+        url: string,
+    },
+    response: {
+        status: number,
+        data: any
+    }
+}
+
+export interface ReaderOutputWs {
+    type: "ws",
+    timestamp: string,
+    direction: "send" | "recv",
+    data: any
+}
+
+export type ReaderOutput = ReaderOutputHttp | ReaderOutputWs;
+
 const CLIENT_IP = '10.0.2.100';
 
 enum WebsocketOpcode {
@@ -49,7 +72,7 @@ export class ProtocolHandler {
 
     constructor(
         public log: Function,
-        public output: Function
+        public output: (data: ReaderOutput) => void
     ) {}
 
     async handleWebsocketPayload(isRequest: boolean,
@@ -62,9 +85,8 @@ export class ProtocolHandler {
             data = buffer.toString('utf-8');
         } else {
             this.discordWsStreamInflator.push(Uint8Array.from(buffer), flush ? ZlibSync.Z_SYNC_FLUSH : null);
-            if (this.discordWsStreamInflator.result) {
-                data = this.discordWsStreamInflator.result.toString();
-            }
+
+            data = this.discordWsStreamInflator.result?.toString();
 
             if (this.discordWsStreamInflator.err) {
                 throw Error("WS stream inflate failed: " + this.discordWsStreamInflator.msg);
@@ -152,7 +174,7 @@ export class ProtocolHandler {
                 },
                 "response": {
                     "status": responseHeaders[':status'],
-                    "data": responseDataJson !== undefined ? responseDataJson : responseData
+                    "data": responseDataJson ?? responseData
                 }
             }
         );
