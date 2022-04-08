@@ -62,6 +62,12 @@ export class LoginDiscordTask extends DiscordTask {
 
         console.log("Logged in: " + nameTag);
         await page.waitForTimeout(1000);
+
+        if (await page.$('form[class^="focusLock"]')) {
+            console.log("Modal detected, attempting to close")
+            await page.keyboard.press('Escape');
+            await page.waitForTimeout(1000);
+        }
     }
 }
 
@@ -98,7 +104,7 @@ export class ProfileDiscordTask extends DiscordTask {
         );
 
         let email: string = null;
-        for (let i = 0; i < 3; i++) {
+        for (let i = 0; i < 4; i++) {
             await revealEmailButton.click();
 
             email = await (await page.$x(
@@ -248,11 +254,9 @@ export class ChannelDiscordTask extends DiscordTask {
         let scrollTimes = 0;
 
         while (true) {
-            const lastMessageSelector = `ol[data-list-id="chat-messages"] > li[id^="chat-messages"]:last-of-type`;
-            let lastMessageId = await page.$eval(
-                lastMessageSelector,
-                el => el.attributes['id'].value.split('-')[2]
-            );
+            const messageSelector = `ol[data-list-id="chat-messages"] li[id^="chat-messages"]`;
+            let messageIds = await page.$$eval(messageSelector, els => els.map(el => el.id.split('-')[2]));
+            let lastMessageId = messageIds[messageIds.length - 1];
 
             if (this.before) {
                 if (lastMessageId >= datetimeToDiscordSnowflake(this.before)) {
@@ -267,7 +271,7 @@ export class ChannelDiscordTask extends DiscordTask {
             }
 
             console.log(`Scrolling to last message (ID ${lastMessageId})...`)
-            await page.$eval(lastMessageSelector,
+            await page.$eval(`#chat-messages-${lastMessageId}`,
                 el => el.scrollIntoView({ behavior: 'smooth', block: 'end'})
             );
             await page.waitForTimeout(1_000);
@@ -287,6 +291,54 @@ export class ChannelDiscordTask extends DiscordTask {
         await this._scrollChat(page);
 
         //await page.waitForTimeout(15_000);
+    }
+}
+
+
+export class ServerDiscordTask extends DiscordTask {
+    type = "ServerDiscordTask";
+    after?: Date;
+    before?: Date;
+
+    constructor(
+        public serverId: string,
+        after?: Date | string,
+        before?: Date | string,
+    ) {
+        super();
+
+        this.after = typeof after == "string" ? new Date(after) : after;
+        this.before = typeof before == "string" ? new Date(before) : before;
+    }
+
+    async perform(page: puppeteer_types.Page) {
+        await waitForAndClick(page, 
+            `[data-list-item-id=guildsnav___${this.serverId}]`,
+            `Server ID ${this.serverId} not found`
+        );
+        // TODO wait for/verify that the server has loaded
+        // perhaps by verifying its name against the title of the icon
+        await page.waitForTimeout(1_500);
+
+        // Make sure all categories are open  
+
+        for await(const el of await page.$$('#channels ul li [class*="collapsed-"]')) {
+            el.click();
+            // TODO await properly for the category to be expanded
+            await page.waitForTimeout(200);
+        }
+        
+        // Return a list of tasks for each channel
+        const channels = await page.$$('#channels ul li a[role="link"]');
+
+        console.log(`Discovered ${channels.length} channels, creating tasks`);
+        
+        return await Promise.all(
+            channels.map(async (el) => {
+                const channelId = await el.evaluate(el => el.attributes['data-list-item-id'].value.split('_')[3]);
+                return new ChannelDiscordTask(this.serverId, channelId, this.after, this.before);
+            })
+        );
     }
 }
     

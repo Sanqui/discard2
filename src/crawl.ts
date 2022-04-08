@@ -4,6 +4,7 @@ import * as fs from 'fs/promises';
 import * as puppeteer_types from 'puppeteer';
 import puppeteer from 'puppeteer-extra'
 import StealthPlugin from 'puppeteer-extra-plugin-stealth'
+import pressAnyKey from 'press-any-key';
 
 import { CaptureTool } from './captureTools/captureTools';
 //import { Mitmdump } from './captureTools/mitmdump';
@@ -164,6 +165,9 @@ export class Crawler {
                 newTasks = await task.perform(page);
             } catch (error) {
                 console.log("Caught error while performing task: " + error);
+                if (!this.headless) {
+                    await pressAnyKey("Press any key to exit...");
+                }
                 await this.browser.close();
                 await this.captureTool.close();
                 throw error;

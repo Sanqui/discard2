@@ -56,3 +56,14 @@ export async function waitForAndClick(page: puppeteer.Page, selector: string, er
     }
     await page.click(selector);
 }
+
+//export async function reachElementWithTab(page: puppeteer.Page, el: puppeteer.ElementHandle) {
+//    while(true) {
+//        let focusedElement = await page.evaluateHandle(() => document.activeElement);
+//        if (focusedElement === el) {
+//            return;
+//        }
+//        await page.keyboard.press('Tab');
+//        await page.waitForTimeout(200);
+//    }
+//}

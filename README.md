@@ -7,8 +7,8 @@ WIP.
 Capture tools supported without Docker: `none`, `mitmproxy`
 
 ```bash
-npm run start -- -c none profile
-npm run start -- -c none channel 954365197735317514 954365219411460138 --after 2010-01-01 --before 2023-03-18
+npm run start -- profile -c none
+npm run start -- channel 954365197735317514 954365219411460138 -c none --after 2010-01-01 --before 2023-03-18
 ```
 
 Docker:

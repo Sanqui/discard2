@@ -1,9 +1,8 @@
-import pressAnyKey from 'press-any-key';
 import dotenv from 'dotenv';
 import { Command, Option } from 'commander';
 
 import { Crawler, Task } from './crawl';
-import { DiscordProject, ProfileDiscordTask, ChannelDiscordTask } from './discord';
+import { DiscordProject, ProfileDiscordTask, ChannelDiscordTask, ServerDiscordTask } from './discord';
 import { Reader } from './reader/reader';
 import { DummyCaptureTool } from './captureTools/captureTools';
 import { Mitmdump } from './captureTools/mitmdump';
@@ -54,13 +53,7 @@ async function crawler(opts, mode: string, tasks: Task[]) {
         headless: opts.headless,
     });
 
-    try {
-        await crawler.run();
-    } catch (error) {
-        console.log("Caught error: " + error.message);
-        await pressAnyKey("Press any key to exit...");
-        throw error;
-    }
+    await crawler.run();
 }
 
 
@@ -81,6 +74,18 @@ addCommonOptions(program.command('channel'))
         crawler(opts, 'channel',
         [
             new ChannelDiscordTask(serverId, channelId, opts.after, opts.before)
+        ])
+    });
+
+addCommonOptions(program.command('server'))
+    .description('Scrape a single server')
+    .argument('<server-id>', 'Server ID')
+    .option('--after <date>', 'Date after which to retrieve history')
+    .option('--before <date>', 'Date before which to retrieve history')
+    .action( async (serverId, opts) => {
+        crawler(opts, 'channel',
+        [
+            new ServerDiscordTask(serverId, opts.after, opts.before)
         ])
     });
 
