@@ -1,5 +1,6 @@
 import dotenv from 'dotenv';
 import { Command, Option } from 'commander';
+import { spawn } from 'child_process';
 
 import { Crawler, Task } from './crawl';
 import { DiscordProject, ProfileDiscordTask, ChannelDiscordTask, ServerDiscordTask } from './discord';
@@ -101,6 +102,21 @@ program.command('reader')
     .action( async (jobPath, opts) => {
         let reader = new Reader(jobPath, opts.verbose, opts.format);
         reader.read();
+    })
+
+
+// convenience function because Wireshark's open file dialogs
+// are annoying
+program.command('open-wireshark')
+    .argument('<job-path>', 'Path to job directory')
+    .action( async (jobPath, opts) => {
+        let args = [
+            // read capture file
+            '-r', `${jobPath}/capture.pcapng`,
+            // use ssl keylog file to decrypt TLS
+            '-o', `tls.keylog_file:${jobPath}/sslkeys.pms`,
+        ];
+        spawn('wireshark', args);
     })
 
 program.parse();

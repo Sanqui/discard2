@@ -2,6 +2,7 @@
 // Heavily hardcoded for Discord capture processing
 
 import { Buffer } from 'buffer';
+var equal = require('deep-equal');
 
 import brotli from 'brotli';
 import { gzip, ungzip } from 'node-gzip';
@@ -29,8 +30,6 @@ export interface ReaderOutputWs {
 }
 
 export type ReaderOutput = ReaderOutputHttp | ReaderOutputWs;
-
-const CLIENT_IP = '10.0.2.100';
 
 enum WebsocketOpcode {
     CONTINUATION = 0x0,
@@ -61,19 +60,41 @@ class HTTP2Stream {
     }
 }
 
+type IPAddress = string;
+type PortNumber = number;
+type IPPort = {
+    ip: IPAddress,
+    port: PortNumber
+};
+type ConnectionIdentifier = {
+    addrClient: IPPort,
+    addrServer: IPPort
+};
+
+class HTTP2Connection {
+    streams: {[key: number]: HTTP2Stream};
+    constructor(
+        public connection: ConnectionIdentifier
+    ) {
+        this.streams = {};
+    }
+}
+
 function hexToBuffer(hex: string): Buffer {
     return Buffer.from(hex.replace(/:/g, ''), 'hex')
 }
 
 export class ProtocolHandler {
-    httpStreams: {[key: number]: HTTP2Stream} = {};
+    httpConnections: Map<ConnectionIdentifier, HTTP2Connection>;
     discordWsStreamPort: number;
     discordWsStreamInflator: any;
 
     constructor(
         public log: Function,
         public output: (data: ReaderOutput) => void
-    ) {}
+    ) {
+        this.httpConnections = new Map();
+    }
 
     async handleWebsocketPayload(isRequest: boolean,
             buffer: Buffer,
@@ -173,7 +194,7 @@ export class ProtocolHandler {
                     "url": requestHeaders[':path'],
                 },
                 "response": {
-                    "status": responseHeaders[':status'],
+                    "status": parseInt(responseHeaders[':status']),
                     "data": responseDataJson ?? responseData
                 }
             }
@@ -184,10 +205,10 @@ export class ProtocolHandler {
         let layers = packet._source.layers;
         let timestamp = layers['frame']['frame.time_epoch'];
         let frameNum = layers['frame']['frame.number'];
-        const isRequest = layers.ip['ip.src'] === CLIENT_IP;
     
-        if (!isRequest && layers.http) {
+        if (layers.http && !layers.http2) {
             // Discord uses HTTP only for initiating websockets
+            if (!layers.http[0]) return; // Possibly a proxy request
             if (layers.http[0]['http.upgrade'] != 'websocket') return;
             if (!layers.http[0]['http.response_for.uri'].startsWith('https://gateway.discord.gg/')) return;
     
@@ -200,12 +221,29 @@ export class ProtocolHandler {
     
             // Skip the first 2 bytes
             await this.handleWebsocketPayload(
-                isRequest,
+                false,
                 hexToBuffer(layers.http[1]['data']['data.data'].slice(6)),
                 timestamp
             );
         }
         else if (layers.http2) {
+            let addrSrc: IPPort = {ip: layers.ip['ip.src'], port: layers.tcp['tcp.srcport']};
+            let addrDst: IPPort = {ip: layers.ip['ip.dst'], port: layers.tcp['tcp.dstport']};
+            let httpConnection: HTTP2Connection;
+            for (const [c, hc] of this.httpConnections) {
+                if (equal(c.addrClient, addrSrc) && equal(c.addrServer, addrDst)
+                    || equal(c.addrClient, addrDst) && equal(c.addrServer, addrSrc))
+                {
+                    httpConnection = hc;
+                }
+            }
+            if (!httpConnection) {
+                let connection = {addrClient: addrSrc, addrServer: addrDst};
+                this.log("New HTTP connection: " + JSON.stringify(connection));
+                httpConnection = new HTTP2Connection(connection);
+                this.httpConnections.set(connection, httpConnection);
+            }
+            let isRequest = equal(addrSrc, httpConnection.connection.addrClient);
             // ridiculous what we have to do because of tshark output
             let packet_streams = layers.http2;
             let framesInPacket = [];
@@ -239,21 +277,21 @@ export class ProtocolHandler {
                 }
                 //this.log(`${isRequest?">":"<"} i${index} f${frameNum} - frame, streamid ${streamid}, type ${frameType}, end ${endStream}`);
     
-                if (this.httpStreams[streamid] === undefined) {
-                    this.httpStreams[streamid] = new HTTP2Stream();
-                    this.httpStreams[streamid].id = streamid;
-                    this.httpStreams[streamid].timestamp_start = timestamp;
+                if (httpConnection.streams[streamid] === undefined) {
+                    httpConnection.streams[streamid] = new HTTP2Stream();
+                    httpConnection.streams[streamid].id = streamid;
+                    httpConnection.streams[streamid].timestamp_start = timestamp;
                 }
-                let request = this.httpStreams[streamid][isRequest ? 'request' : 'response'];
+                let request = httpConnection.streams[streamid][isRequest ? 'request' : 'response'];
                 if (request[frameType]) {
                     throw new Error('Same frame type encountered multiple times for stream ' + streamid);
                 }
                 request[frameType] = frame;
     
                 if (endStream && !isRequest) {
-                    this.httpStreams[streamid].timestamp_end = timestamp;
-                    await this.handleHttpStream(this.httpStreams[streamid]);
-                    delete this.httpStreams[streamid];
+                    httpConnection.streams[streamid].timestamp_end = timestamp;
+                    await this.handleHttpStream(httpConnection.streams[streamid]);
+                    delete httpConnection.streams[streamid];
                 }
             }
         } else if (layers.websocket) {
@@ -264,12 +302,8 @@ export class ProtocolHandler {
             // zlib compressed data, but we should check against the URL
             // (typically wss://gateway.discord.gg/?encoding=json&v=9&compress=zlib-stream)
             // TODO verify for "fin" flag
-    
-            if (isRequest && layers.tcp['tcp.srcport'] != this.discordWsStreamPort
-                || !isRequest && layers.tcp['tcp.dstport'] != this.discordWsStreamPort
-            ) {
-                return;
-            }
+
+            let isRequest = layers.tcp['tcp.srcport'] == this.discordWsStreamPort;
     
             //this.log(`${isRequest?">":"<"} i${index} f${frameNum} WS`);
             //this.log(layers);

@@ -40,9 +40,9 @@ interface CrawlerParams {
     mode: string,
     outputDir?: string,
     browserDataDir?: string,
-    serverSideReplayFile?: string,
     headless?: boolean,
-    captureTool: typeof CaptureTool
+    captureTool: typeof CaptureTool,
+    proxyServerAddress?: string,
 }
 
 export class Crawler {
@@ -56,6 +56,7 @@ export class Crawler {
     startMitmdump: boolean = true;
     headless: boolean;
     tasks: Task[];
+    proxyServerAddress: string | null;
 
     constructor(params: CrawlerParams) {
         this.project = params.project;
@@ -65,12 +66,9 @@ export class Crawler {
         // set job name to UTC timestamp
         this.jobName = new Date().toISOString() + '-' + params.mode;
         this.dataPath = (params.outputDir || 'out') + `/${this.jobName}`;
-        if (!params.serverSideReplayFile) {
-            this.captureTool = new params.captureTool(this.dataPath);
-        } else {
-            this.captureTool= new params.captureTool(params.serverSideReplayFile, true);
-        }
+        this.captureTool = new params.captureTool(this.dataPath);
         this.headless = params.headless || false;
+        this.proxyServerAddress = params.proxyServerAddress;
     }
     
     async saveState() {
@@ -123,9 +121,11 @@ export class Crawler {
             runningInDocker = true;
         } catch {}
 
+        let proxyServerAddress = this.proxyServerAddress ?? this.captureTool.proxyServerAddress;
+
         this.browser = await puppeteer.launch({
             args: [
-                this.captureTool.proxyServerAddress ? `--proxy-server=${this.captureTool.proxyServerAddress}` : '',
+                proxyServerAddress ? `--proxy-server=${proxyServerAddress}` : '',
                 '--ignore-certificate-errors',
                 '--disable-gpu',
                 '--force-prefers-reduced-motion',
@@ -147,6 +147,11 @@ export class Crawler {
             }
         });
         const page = await this.browser.newPage();
+
+        try {
+            await page.goto("http://x-determine-client-address.invalid", {timeout: 100});
+        } catch {}
+        
 
         this.state.tasksQueued = [
             ...this.project.initialTasks,

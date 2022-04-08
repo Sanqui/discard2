@@ -3,19 +3,13 @@ import { spawn } from 'child_process';
 import { CaptureTool } from './captureTools';
 
 export class Tshark extends CaptureTool {
-    supportsReplay = false;
-
     process: any;
     filePath: string;
     closed: boolean;
     stderr: string;
 
-    constructor(dataPath: string, replay?: boolean) {
-        super(dataPath, replay);
-
-        if (replay && !this.supportsReplay) {
-            throw new Error(`Capture tool ${this.constructor.name} does not support replay`);
-        }
+    constructor(dataPath: string) {
+        super(dataPath);
         
         this.filePath = dataPath + '/capture.pcapng';
     }
@@ -39,7 +33,7 @@ export class Tshark extends CaptureTool {
             // Capture all interfaces
             '-ni', 'any',
             // Ignore loopback traffic -- Chrome (perhaps with Puppeteer) is extremely noisy
-            '-f', 'not (src 127.0.0.1 and dst 127.0.0.1)',
+            '-f', 'not (src 127.0.0.1 and dst 127.0.0.1 and not port 8080)',
         ];
         this.process = spawn('tshark', args).on('exit', code => {
             if (code != 0 && code != 255) {

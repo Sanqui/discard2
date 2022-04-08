@@ -33,12 +33,12 @@ export class Mitmdump extends CaptureTool {
 
     process: any;
     filePath: string;
-    replay: boolean;
+    replay: boolean = false;;
     closed: boolean;
     mitmdumpPath: string;
 
     constructor(dataPath: string, replay?: boolean) {
-        super(dataPath, replay);
+        super(dataPath);
         
         this.filePath = dataPath + '/capture.mitmdump';
         this.replay = replay || false;
@@ -98,4 +98,8 @@ export class Mitmdump extends CaptureTool {
             this.closed = true;
         }
     }
+}
+
+export class MitmdumpReplay extends Mitmdump {
+    replay = true;
 }

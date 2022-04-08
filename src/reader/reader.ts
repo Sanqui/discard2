@@ -6,8 +6,9 @@ import { parser } from 'stream-json';
 import { streamArray } from 'stream-json/streamers/StreamArray';
 
 import { ProtocolHandler, ReaderOutput } from './proto';
+export { ReaderOutput } from './proto';
 
-enum OutputFormats {
+export enum OutputFormats {
     PRINT = 'print',
     JSONL = 'jsonl'
 }
@@ -16,7 +17,8 @@ export class Reader {
     constructor(
         public path: string,
         public verbose: boolean = false,
-        public outputFormat: OutputFormats = OutputFormats.PRINT
+        public outputFormat: OutputFormats = OutputFormats.PRINT,
+        public outputFunction: (data: ReaderOutput) => void = null
     ) {}
 
     async log(...args: any[]) {
@@ -26,8 +28,12 @@ export class Reader {
     }
 
     async output(data: ReaderOutput) {
-        if (this.outputFormat == OutputFormats.JSONL) {
-            console.log(JSON.stringify(data));
+        if (this.outputFunction) {
+            this.outputFunction(data);
+        } else {
+            if (this.outputFormat == OutputFormats.JSONL) {
+                console.log(JSON.stringify(data));
+            }
         }
     }
 
