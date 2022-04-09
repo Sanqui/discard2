@@ -31,6 +31,6 @@
   "scripts": {
     "start": "ts-node ./src/cli.ts",
     "start_trace": "node --trace-warnings -r ts-node/register ./src/cli.ts",
-    "test": "jest --detectOpenHandles --coverage"
+    "test": "jest --detectOpenHandles --coverage --runInBand"
   }
 }

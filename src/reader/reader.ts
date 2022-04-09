@@ -22,7 +22,7 @@ export class Reader {
     ) {}
 
     async log(...args: any[]) {
-        if (this.verbose && this.outputFormat == OutputFormats.PRINT) {
+        if (this.verbose && (this.outputFormat == OutputFormats.PRINT || this.outputFunction)) {
             console.log(...args)
         }
     }
@@ -53,6 +53,9 @@ export class Reader {
             '-r', `${this.path}/capture.pcapng`,
             // use ssl keylog file to decrypt TLS
             '-o', `tls.keylog_file:${this.path}/sslkeys.pms`,
+            // reassemble out of order TCP segments
+            // see https://www.wireshark.org/docs/wsug_html_chunked/ChAdvReassemblySection
+            '-o', 'tcp.reassemble_out_of_order:true',
             // filter http2 or websocket packets
             '-Y', 'http or http2 or websocket',
             // use the JSON output format
@@ -72,10 +75,6 @@ export class Reader {
         //this.log("tshark args:", args.join(' '));
     
         let process = spawn('tshark', args);
-    
-        for await (const obj of process.stdout.pipe(parser()).pipe(streamArray())) {
-            await protocolHandler.handlePacket(obj.key, obj.value);
-        }
         
         process.on('exit', code => {
             if (code != 0 && code != 255) {
@@ -83,6 +82,10 @@ export class Reader {
                 throw new Error(`tshark exited with code ${code}`);
             }
         });
+    
+        for await (const obj of process.stdout.pipe(parser()).pipe(streamArray())) {
+            await protocolHandler.handlePacket(obj.key, obj.value);
+        }
     }
 
 }

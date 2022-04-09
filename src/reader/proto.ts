@@ -137,6 +137,10 @@ export class ProtocolHandler {
             }
             return result;
         }
+        if (!stream.request[HTTP2FrameType.HEADERS]) {
+            console.log('Warning: No request headers in http2 stream ' + stream.id);
+            return;
+        }
         let requestHeaders = convertHeaders(stream.request[HTTP2FrameType.HEADERS]['http2.header']);
         if (stream.response[HTTP2FrameType.HEADERS] == undefined) {
             throw new Error('No response headers in stream ' + stream.id);
@@ -239,7 +243,7 @@ export class ProtocolHandler {
             }
             if (!httpConnection) {
                 let connection = {addrClient: addrSrc, addrServer: addrDst};
-                this.log("New HTTP connection: " + JSON.stringify(connection));
+                //this.log("New HTTP connection: " + JSON.stringify(connection));
                 httpConnection = new HTTP2Connection(connection);
                 this.httpConnections.set(connection, httpConnection);
             }
@@ -302,6 +306,8 @@ export class ProtocolHandler {
             // zlib compressed data, but we should check against the URL
             // (typically wss://gateway.discord.gg/?encoding=json&v=9&compress=zlib-stream)
             // TODO verify for "fin" flag
+
+            if (!this.discordWsStreamPort) return;
 
             let isRequest = layers.tcp['tcp.srcport'] == this.discordWsStreamPort;
     

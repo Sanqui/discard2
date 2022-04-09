@@ -10,7 +10,7 @@ import { Reader, OutputFormats, ReaderOutput } from './reader/reader';
 const TEST_DISCORD_EMAIL = "test_ahcae@protonmail.com";
 const TEST_DISCORD_PASSWORD = "9jVjMMp11QY1sMiJh87hDShqQ";
 
-jest.setTimeout(45_000);
+jest.setTimeout(60_000);
 
 test('restarts mitmdump twice', async () => {
     let mitmdump = new Mitmdump((await fs.mkdtemp("/tmp/discard2-test-")));
@@ -79,6 +79,9 @@ test('runs a channel job against a replay', async () => {
     await mitmdump.close();
 
     console.log("Data path is", crawler.dataPath);
+    // show list of files under crawler.dataPath
+    let files = await fs.readdir(crawler.dataPath);
+    console.log("Files are", files);
 
     let state = JSON.parse(await fs.readFile(`${crawler.dataPath}/state.json`, 'utf8'));
     expect(state.jobFinished).toBeTruthy();
@@ -87,7 +90,7 @@ test('runs a channel job against a replay', async () => {
 
     let reader = new Reader(crawler.dataPath, false, OutputFormats.JSONL,
         (data: ReaderOutput) => {
-            // TODO handle in a more proper way
+            //console.log(data);
             if (data.type == "http"
                 && data.request.method == "GET"
                 && data.request.url.includes("/messages")
