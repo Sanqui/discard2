@@ -1,22 +1,6 @@
-FROM node:16-buster-slim AS build
+FROM fedora:36 AS build
 
-RUN apt-get update \
-  && echo "wireshark-common wireshark-common/install-setuid boolean true" | debconf-set-selections \
-  && DEBIAN_FRONTEND=noninteractive apt-get install -y wget \
-  build-essential \
-  # tshark for its post-install scripts
-  tshark \
-  # Wireshark dependencies
-  git cmake libpcap-dev libc-ares-dev libgcrypt20-dev libglib2.0-dev flex bison libpcre2-dev libnghttp2-dev libcap-dev lua5.2-dev \
-  # Chrome dependencies
-  ca-certificates fonts-liberation libasound2 libatk-bridge2.0-0 libatk1.0-0 libc6 libcairo2 libcups2 libdbus-1-3 libexpat1 libfontconfig1 libgbm1 libgcc1 libglib2.0-0 libgtk-3-0 libnspr4 libnss3 libpango-1.0-0 libpangocairo-1.0-0 libstdc++6 libx11-6 libx11-xcb1 libxcb1 libxcomposite1 libxcursor1 libxdamage1 libxext6 libxfixes3 libxi6 libxrandr2 libxrender1 libxss1 libxtst6 lsb-release xdg-utils
-
-# Build and install Wireshark (tshark) 3.6 -- we need this version
-
-RUN git clone --depth 1 -b release-3.6 https://gitlab.com/wireshark/wireshark.git /wireshark \
-  && cd /wireshark \
-  && mkdir build && cd build \
-  && cmake -DBUILD_wireshark=OFF ../ && make -j`nproc --ignore 2` && make install
+RUN dnf install -y wget wireshark-cli nodejs chromium make gcc g++
 
 RUN groupadd -r pptruser && useradd -r -g pptruser -G audio,video,wireshark pptruser \
     && mkdir -p /home/pptruser/Downloads \
