@@ -41,6 +41,7 @@ function addCommonOptions(command: Command) {
                 .env('CAPTURE_TOOL').makeOptionMandatory()
         )
         .option('--headless', 'Run in headless mode')
+        .option('--block-images', 'Do not load images to conserve bandwidth')
     ;
 }
 
@@ -52,6 +53,7 @@ async function crawler(opts, mode: string, tasks: Task[]) {
         browserDataDir: opts.browserDataDir,
         captureTool: captureTools[opts.captureTool],
         headless: opts.headless,
+        blockImages: opts.blockImages,
     });
 
     await crawler.run();

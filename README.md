@@ -6,6 +6,9 @@ WIP.
 
 Capture tools supported without Docker: `none`, `mitmproxy`
 
+Please keep in mind Discord's search filters are exclusive.  That means if you search for `after:2022-01-01` you only get messages beginning with 2022-01-02.
+
+
 ```bash
 npm run start -- profile -c none
 npm run start -- channel 954365197735317514 954365219411460138 -c none --after 2010-01-01 --before 2023-03-18
@@ -16,7 +19,7 @@ Docker:
 ```bash
 docker build -f Containerfile -t discard2 --target run .
 docker run --env-file=.env -v $PWD/out:/app/out:Z,U --cap-add=NET_RAW --cap-add=NET_ADMIN -it \
-    discard2 -- profile -c tshark --headless
+    discard2 -- profile -c tshark --headless --block-images
 ```
 
 To use the `tshark` capture tool without Docker, you need to add your user to the wireshark group:

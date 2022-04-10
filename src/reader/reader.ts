@@ -4,6 +4,7 @@ import * as fs from 'fs/promises';
 
 import { parser } from 'stream-json';
 import { streamArray } from 'stream-json/streamers/StreamArray';
+import { State } from '../crawl';
 
 import { ProtocolHandler, ReaderOutput } from './proto';
 export { ReaderOutput } from './proto';
@@ -39,9 +40,9 @@ export class Reader {
 
     async read() {
         const contents = await fs.readFile(`${this.path}/state.json`, 'utf8');
-        const state = JSON.parse(contents);
+        const state = JSON.parse(contents) as State;
     
-        this.log(`Loaded job ${state.jobName}`);
+        this.log(`Loaded job ${state.job.name}`);
 
         const protocolHandler = new ProtocolHandler(
             this.log.bind(this),

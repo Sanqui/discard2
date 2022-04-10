@@ -36,6 +36,7 @@ test('initializes a crawler', async () => {
         outputDir: await fs.mkdtemp("/tmp/discard2-test-"),
         captureTool: DummyCaptureTool,
         headless: true,
+        blockImages: true,
     });
     expect(crawler).toBeTruthy();
 });
@@ -50,6 +51,7 @@ test('runs a profile job against a replay', async () => {
         captureTool: Tshark,
         headless: true,
         proxyServerAddress: mitmdump.proxyServerAddress,
+        blockImages: true,
     });
 
     await mitmdump.start();
@@ -78,7 +80,7 @@ async function checkForMessages(dataPath: string, expected: Set<string>) {
             }
         });
     await reader.read();
-    expect(expected).toEqual(expected);
+    expect(seen).toEqual(expected);
 }
 
 test('runs a channel job against a replay', async () => {
@@ -93,6 +95,7 @@ test('runs a channel job against a replay', async () => {
         captureTool: Tshark,
         headless: true,
         proxyServerAddress: mitmdump.proxyServerAddress,
+        blockImages: true,
     });
 
     await mitmdump.start();
@@ -117,6 +120,7 @@ test('runs a server job against a replay', async () => {
         captureTool: Tshark,
         headless: true,
         proxyServerAddress: mitmdump.proxyServerAddress,
+        blockImages: true,
     });
 
     await mitmdump.start();
@@ -126,7 +130,12 @@ test('runs a server job against a replay', async () => {
     const state = JSON.parse(await fs.readFile(`${crawler.dataPath}/state.json`, 'utf8')) as State;
     expect(state.job.completed).toBeTruthy();
 
-    await checkForMessages(crawler.dataPath, new Set(["testing 123", "300", "chat msg", "test message left in channel chat2"]));
+    console.log(`dataPath: ${crawler.dataPath}`);
+
+    await checkForMessages(crawler.dataPath, new Set(
+        ["testing 123", "300", "chat msg", "test message left in channel chat2",
+        "message in last channel"]
+    ));
 });
 
 // TODO add a test to read a real pcapng capture,

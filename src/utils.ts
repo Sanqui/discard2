@@ -10,7 +10,7 @@ export async function getUrlsFromLinks(page: puppeteer.Page, selector: string): 
 }
 
 // Inspired by https://stackoverflow.com/a/56892074
-export async function retry(promiseFactory, retryCount: number, name?: string) {
+export async function retry(promiseFactory: () => Promise<any>, retryCount: number, name?: string): Promise<any> {
     try {
         return await promiseFactory();
     } catch (error) {
@@ -23,8 +23,8 @@ export async function retry(promiseFactory, retryCount: number, name?: string) {
             if (name) {
                 error_string = `${error_string} when ${name}`
             }
-            console.log(`${error_string}, retrying ${retryCount - 1} more times`);
-            return await retry(promiseFactory, retryCount - 1, name);
+            //console.log(`${error_string}, retrying ${retryCount - 1} more times`);
+            return retry(promiseFactory, retryCount - 1, name);
         } else {
             throw error;
         }
@@ -54,7 +54,17 @@ export async function waitForAndClick(page: puppeteer.Page, selector: string, er
     } catch (e) {
         throw new Error(error_message)
     }
-    await page.click(selector);
+    await page.$eval(selector,
+        el => el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    );
+    await page.click(selector, { delay: 100 });
+}
+
+export async function waitForUrlStartsWith(page: puppeteer.Page, url: string) {
+    return page.waitForFunction(
+        (url: string) => window.location.pathname.startsWith(url),
+        {}, url
+    );
 }
 
 //export async function reachElementWithTab(page: puppeteer.Page, el: puppeteer.ElementHandle) {

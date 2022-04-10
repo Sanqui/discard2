@@ -209,6 +209,11 @@ export class ProtocolHandler {
         const layers = packet['_source']['layers'] as unknown;
         const timestamp = layers['frame']['frame.time_epoch'] as string;
         const frameNum = layers['frame']['frame.number'] as number;
+
+        if (layers['tcp']['tcp.analysis.lost_segment']) {
+            this.log(`Warning: tshark reports lost TCP segment: ${timestamp} ${index} ${frameNum}`);
+            return;
+        }
     
         if (layers['http'] && !layers['http2']) {
             // Discord uses HTTP only for initiating websockets

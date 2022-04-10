@@ -1,7 +1,7 @@
 import * as puppeteer_types from 'puppeteer';
 import dateFormat from "dateformat";
 
-import {retry, retryGoto, clickAndWaitForNavigation, getUrlsFromLinks, waitForAndClick} from './utils';
+import {retry, retryGoto, clickAndWaitForNavigation, getUrlsFromLinks, waitForAndClick, waitForUrlStartsWith} from './utils';
 import {Project, Task} from './crawl';
 
 const discord_url = new URL("https://discord.com/");
@@ -30,6 +30,8 @@ export class LoginDiscordTask extends DiscordTask {
     }
 
     async perform(page: puppeteer_types.Page) {
+        await page.bringToFront();
+        
         await retryGoto(page, new URL("https://discord.com/login"));
 
         await page.waitForSelector("#app-mount")
@@ -42,14 +44,26 @@ export class LoginDiscordTask extends DiscordTask {
             await page.type('input[name="email"]', this_.discordEmail);
             await page.type('input[name="password"]', this_.discordPassword);
 
-            await clickAndWaitForNavigation(page, 'button[type="submit"]')
+
+            const captchaSelector = 'iframe[src*="captcha/"]';
+            await Promise.race([
+                Promise.all([
+                    page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 10000}),
+                    page.click('button[type="submit"]')
+                ]),
+                page.waitForSelector(captchaSelector)
+            ]);
+            
+            if (await page.$(captchaSelector)) {
+                throw new Error("Captcha detected on login.  It is recommended you log into this account manually in a browser from the same IP.")
+            }
         }
 
         if (await page.$('form[class^="authBox"]')) {
             await fillInLoginForm();
         } else if (await page.$('[class*="chooseAccountAuthBox"]')) {
             console.log("Encountered 'Choose an account' screen")
-            await page.click('[class*="chooseAccountAuthBox"] [class^="actions"] button')
+            await page.click('[class*="chooseAccountAuthBox"] [class^="actions"] button[class*="lookLink"]')
 
             await fillInLoginForm();
 
@@ -141,6 +155,32 @@ export class ProfileDiscordTask extends DiscordTask {
     }
 }
 
+async function openServer(page: puppeteer_types.Page, serverId: string) {
+    const channelLinkSelector = `#channels ul li a[href^="/channels/${serverId}"]`;
+    
+    if (await page.$(channelLinkSelector)) {
+        // This server is already open
+    } else {
+        await waitForAndClick(page, 
+            `[data-list-item-id=guildsnav___${serverId}]`,
+            `Server ID ${serverId} not found`
+        );
+
+        // Wait for a single channel link with this server ID to appear
+        // TODO: This may fail on servers without any available channel.
+
+        await page.waitForSelector(`#channels ul li a[href^="/channels/${serverId}"]`);
+    }
+
+    // Make sure all categories are expanded  
+
+    for await(const el of await page.$$('#channels ul li [class*="collapsed-"]')) {
+        await el.click();
+        // TODO await properly for the category to be expanded
+        await page.waitForTimeout(200);
+    }
+}
+
 export class ChannelDiscordTask extends DiscordTask {
     type = "ChannelDiscordTask";
     serverId: string;
@@ -163,64 +203,112 @@ export class ChannelDiscordTask extends DiscordTask {
     }
 
     async _openChannel(page: puppeteer_types.Page) {
-        await waitForAndClick(page, 
-            `[data-list-item-id=guildsnav___${this.serverId}]`,
-            `Server ID ${this.serverId} not found`
+        await openServer(page, this.serverId);
+
+        const channelLinkSelector = `#channels ul li [data-list-item-id=channels___${this.channelId}]`;
+
+        if (!await page.$(channelLinkSelector)) {
+            throw Error(`Channel ID ${this.channelId} not found`);
+        }
+
+        // We need to scroll because of the "New unreads" indicator
+
+        await page.$eval(channelLinkSelector,
+            el => el.scrollIntoView({behavior: "smooth", block: "center", inline: "nearest"})
         );
 
-        await waitForAndClick(page, 
-            `[data-list-item-id=channels___${this.channelId}]`,
-            `Channel ID ${this.channelId} not found`
-        );
+        await retry(async () => {
+            await page.click(channelLinkSelector, { delay: 50 });
+            await page.waitForSelector(`[data-list-id="members-${this.channelId}"]`, { timeout: 200 });
+        }, 10, "opening channel");
 
         console.log(`Channel ${this.channelId} opened`)
     }
 
-    async _searchAndClickFirstResult(page: puppeteer_types.Page): Promise<string | void> {
+    async _pressCtrlF(page: puppeteer_types.Page) {
         await page.keyboard.down('Control');
         await page.keyboard.press('KeyF');
         await page.keyboard.up('Control');
+    }
+
+    async _searchAndClickFirstResult(page: puppeteer_types.Page): Promise<string | void> {
+        await this._pressCtrlF(page);
 
         async function typeDateFilter(name: string, date: Date) {
             if (date) {
-                return await page.keyboard.type(name + ':' + dateFormat(date, "yyyy-mm-dd"), {delay: 100});
+                const el = await page.$('div[aria-label="Search"]');
+                await el.type(name + ':' + dateFormat(date, "yyyy-mm-dd"), {delay: 25});
             }
         }
 
         await typeDateFilter('after', this.after);
         await typeDateFilter('before', this.before);
 
-        async function performAndWaitForSearchResults(action: Promise<void>) {
+        const performAndWaitForSearchResults = async (action: Promise<void>): Promise<string> => {
             const resultsSelector = 'div[class^="totalResults"] > div:first-child';
+            let searchFinished = false;
+            let resultsText: string;
+
             await action;
-            await page.waitForSelector(resultsSelector);
+            while (!searchFinished) {
+                await page.waitForSelector(resultsSelector);
 
-            for (let i = 0; i < 10; i++) {
-                const resultsText = await page.$eval(resultsSelector, el => el.textContent);
-                if (resultsText.trim() != "Searching…") {
-                    return resultsText;
+                const interval = 200;
+                for (let i = 0; i < 10_000/interval; i++) {
+                    resultsText = await page.$eval(resultsSelector, el => el.textContent);
+                    if (!["Searching…", "Indexing…"].includes(resultsText.trim())) {
+                        searchFinished = true;
+                        break;
+                    }
+
+                    await page.waitForTimeout(interval);
                 }
-
-                await page.waitForTimeout(1_000);
+                if (searchFinished) {
+                    // We're either going to get the search results, or an error
+                    const el = await Promise.race([
+                        page.waitForSelector('#search-results'),
+                        page.waitForSelector('section[class^="searchResults"] div[class^="emptyResults"]')
+                    ])
+                    if (await page.$('#search-results')) {
+                        // We got the results
+                        return resultsText;
+                    } else {
+                        const errorEl = await el.$('div[class*="errorMessage"]');
+                        if (!errorEl) {
+                            // There are simply no results.
+                            return resultsText;
+                        } else {
+                            const errorText = await el.evaluate(el => el.textContent);
+                            console.log("Discord returned error for search results: ", errorText);
+                            console.log("This likely signals rate limiting. Will wait for 5s.");
+                            searchFinished = false;
+                            await page.waitForTimeout(5000);
+                            await this._pressCtrlF(page);
+                            await page.keyboard.press('Enter');
+                        }
+                    }
+                } else {
+                    throw Error("Did not get search results after 10 seconds.");
+                }
             }
-            throw Error("Did not get search results after 10 seconds.");
         }
 
-        await performAndWaitForSearchResults(
-            page.keyboard.press('Enter')
-        );
-        
-        // Switch the order from oldest messages
         const results_text = await performAndWaitForSearchResults(
-            page.click(`div[aria-controls="oldest-tab"]`)
+            page.keyboard.press('Enter')
         );
 
         console.log("Search results: " + results_text);
 
         if (results_text == "No Results") {
             // No search results match our criteria -- we're done scraping this channel
+            await page.click('[aria-label="Clear search"]');
             return;
         }
+        
+        // Switch the order from oldest messages
+        await performAndWaitForSearchResults(
+            page.click(`div[aria-controls="oldest-tab"]`)
+        );
 
         const firstResultSelector = `#search-results > ul > li:first-of-type`;
         const firstMessageId = await page.$eval(
@@ -236,7 +324,9 @@ export class ChannelDiscordTask extends DiscordTask {
             }
         }
 
-        await page.click(firstResultSelector);
+        // Reason we click the h2 is that there may be an embed image, link,
+        // or server and we don't that
+        await page.click(`${firstResultSelector} div[class^="contents"] h2`);
         
         // Wait for the message to show up
         await page.waitForSelector(`#chat-messages-${firstMessageId}`);
@@ -312,21 +402,7 @@ export class ServerDiscordTask extends DiscordTask {
     }
 
     async perform(page: puppeteer_types.Page) {
-        await waitForAndClick(page, 
-            `[data-list-item-id=guildsnav___${this.serverId}]`,
-            `Server ID ${this.serverId} not found`
-        );
-        // TODO wait for/verify that the server has loaded
-        // perhaps by verifying its name against the title of the icon
-        await page.waitForTimeout(1_500);
-
-        // Make sure all categories are open  
-
-        for await(const el of await page.$$('#channels ul li [class*="collapsed-"]')) {
-            await el.click();
-            // TODO await properly for the category to be expanded
-            await page.waitForTimeout(200);
-        }
+        await openServer(page, this.serverId);
         
         // Return a list of tasks for each channel
         const channels = await page.$$('#channels ul li a[role="link"]');

@@ -11,7 +11,7 @@ import { CaptureTool } from './captureTools/captureTools';
 
 puppeteer.use(StealthPlugin());
 
-const DISCARD_VERSION = '0.1.0';
+const DISCARD_VERSION = '0.1.1';
 
 export class Task {
     async perform(page: puppeteer_types.Page): Promise<Task[] | void> {
@@ -31,6 +31,7 @@ export type State = {
         name: string,
         completed: boolean,
         error: boolean,
+        errorMessage?: string,
     },
     settings: {
         captureToolName: string,
@@ -58,6 +59,7 @@ interface CrawlerParams {
     headless?: boolean,
     captureTool: typeof CaptureTool,
     proxyServerAddress?: string,
+    blockImages?: boolean
 }
 
 export class Crawler {
@@ -72,6 +74,7 @@ export class Crawler {
     tasks: Task[];
     browserDataDir: string | null;
     proxyServerAddress: string | null;
+    blockImages?: boolean;
 
     constructor(params: CrawlerParams) {
         this.project = params.project;
@@ -85,6 +88,7 @@ export class Crawler {
         this.headless = params.headless || false;
         this.browserDataDir = params.browserDataDir;
         this.proxyServerAddress = params.proxyServerAddress;
+        this.blockImages = params.blockImages;
     }
     
     async saveState() {
@@ -165,10 +169,23 @@ export class Crawler {
         });
         const page = await this.browser.newPage();
 
+        if (this.blockImages) {
+            await page.setRequestInterception(true);
+            page.on('request', (request) => {
+                if (request.resourceType() === 'image') {
+                    void request.abort();
+                }
+                else {
+                    void request.continue();
+                }
+            });
+        }
+
         try {
             await page.goto("http://x-determine-client-address.invalid", {timeout: 100});
         } catch {}
-        
+
+        await page.bringToFront();
 
         this.state.tasks.queued = [
             ...this.project.initialTasks,
@@ -195,6 +212,8 @@ export class Crawler {
                 await this.browser.close();
                 this.captureTool.close();
                 this.state.job.error = true;
+                this.state.job.errorMessage = error.toString() as string;
+                await this.saveState();
                 throw error;
             }
             if (newTasks) {
