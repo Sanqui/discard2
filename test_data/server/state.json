@@ -1,0 +1,51 @@
+{
+  "jobName": "2022-04-10T09:07:30.089Z-channel",
+  "jobMode": "channel",
+  "jobStarted": "2022-04-10T09:07:30.092Z",
+  "jobSaved": "2022-04-10T09:08:07.106Z",
+  "jobFinished": "2022-04-10T09:08:07.106Z",
+  "captureToolName": "Mitmdump",
+  "tasksFailed": [],
+  "currentTask": null,
+  "tasksQueued": [],
+  "tasksFinished": [
+    {
+      "discordEmail": "test_ahcae@protonmail.com",
+      "discordPassword": "9jVjMMp11QY1sMiJh87hDShqQ",
+      "type": "LoginDiscordTask"
+    },
+    {
+      "discordEmail": "test_ahcae@protonmail.com",
+      "type": "ProfileDiscordTask"
+    },
+    {
+      "serverId": "954365197735317514",
+      "type": "ServerDiscordTask"
+    },
+    {
+      "type": "ChannelDiscordTask",
+      "serverId": "954365197735317514",
+      "channelId": "954365197735317517"
+    },
+    {
+      "type": "ChannelDiscordTask",
+      "serverId": "954365197735317514",
+      "channelId": "954365219411460138"
+    },
+    {
+      "type": "ChannelDiscordTask",
+      "serverId": "954365197735317514",
+      "channelId": "961973542663122944"
+    },
+    {
+      "type": "ChannelDiscordTask",
+      "serverId": "954365197735317514",
+      "channelId": "961973613534265425"
+    },
+    {
+      "type": "ChannelDiscordTask",
+      "serverId": "954365197735317514",
+      "channelId": "961993711884062751"
+    }
+  ]
+}

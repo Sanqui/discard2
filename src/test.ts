@@ -1,7 +1,7 @@
 import * as fs from 'fs/promises';
 
 import { Crawler } from './crawl';
-import { DiscordProject, ProfileDiscordTask, ChannelDiscordTask } from './discord';
+import { DiscordProject, ProfileDiscordTask, ChannelDiscordTask, ServerDiscordTask } from './discord';
 import { DummyCaptureTool } from './captureTools/captureTools';
 import { Mitmdump, MitmdumpReplay } from './captureTools/mitmdump';
 import { Tshark } from './captureTools/tshark';
@@ -60,6 +60,27 @@ test('runs a profile job against a replay', async () => {
     expect(state.jobFinished).toBeTruthy();
 });
 
+async function checkForMessages(dataPath: string, expected: Set<string>) {
+    let seen = new Set<string>();
+    let reader = new Reader(dataPath, false, OutputFormats.JSONL,
+        (data: ReaderOutput) => {
+            //console.log(data);
+            if (data.type == "http"
+                && data.request.method == "GET"
+                && data.request.url.includes("/messages")
+                && data.response.status == 200
+            ) {
+                for (let message of expected) {
+                    if (JSON.stringify(data.response.data).includes(message)) {
+                        seen.add(message);
+                    }
+                }
+            }
+        });
+    await reader.read();
+    expect(expected).toEqual(expected);
+}
+
 test('runs a channel job against a replay', async () => {
     const mitmdump = new MitmdumpReplay('./test_data/channel/');
     const crawler = new Crawler({
@@ -78,31 +99,34 @@ test('runs a channel job against a replay', async () => {
     await crawler.run()
     await mitmdump.close();
 
-    console.log("Data path is", crawler.dataPath);
-    // show list of files under crawler.dataPath
-    let files = await fs.readdir(crawler.dataPath);
-    console.log("Files are", files);
+    let state = JSON.parse(await fs.readFile(`${crawler.dataPath}/state.json`, 'utf8'));
+    expect(state.jobFinished).toBeTruthy();
+
+    checkForMessages(crawler.dataPath, new Set(["testing 123", "300"]));
+});
+
+test('runs a server job against a replay', async () => {
+    const mitmdump = new MitmdumpReplay('./test_data/server/');
+    const crawler = new Crawler({
+        project: new DiscordProject(TEST_DISCORD_EMAIL, TEST_DISCORD_PASSWORD),
+        tasks: [
+            new ServerDiscordTask("954365197735317514", null, null)
+        ],
+        mode: 'server',
+        outputDir: await fs.mkdtemp("/tmp/discard2-test-"),
+        captureTool: Tshark,
+        headless: true,
+        proxyServerAddress: mitmdump.proxyServerAddress,
+    });
+
+    await mitmdump.start();
+    await crawler.run()
+    await mitmdump.close();
 
     let state = JSON.parse(await fs.readFile(`${crawler.dataPath}/state.json`, 'utf8'));
     expect(state.jobFinished).toBeTruthy();
 
-    let testMessageRead = false;
-
-    let reader = new Reader(crawler.dataPath, false, OutputFormats.JSONL,
-        (data: ReaderOutput) => {
-            //console.log(data);
-            if (data.type == "http"
-                && data.request.method == "GET"
-                && data.request.url.includes("/messages")
-                && data.response.status == 200
-                && JSON.stringify(data.response.data).includes("testing 123"))
-            {
-                testMessageRead = true;
-            }
-        });
-    await reader.read();
-
-    expect(testMessageRead).toBeTruthy();
+    checkForMessages(crawler.dataPath, new Set(["testing 123", "300", "chat msg", "test message left in channel chat2"]));
 });
 
 // TODO add a test to read a real pcapng capture,

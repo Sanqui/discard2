@@ -33,7 +33,7 @@ function addCommonOptions(command: Command) {
             new Option('-p, --password <password>', 'Discord account password').env('DISCORD_PASSWORD').makeOptionMandatory()
         )
         .addOption(
-            new Option('-b, --browser-data-dir <path>', 'Browser data directory').env('BROWSER_DATA_DIR').makeOptionMandatory()
+            new Option('-b, --browser-data-dir <path>', 'Browser data directory').env('BROWSER_DATA_DIR')
         )
         .addOption(
             new Option('-c, --capture-tool <tool>', 'Capture tool')
@@ -84,7 +84,7 @@ addCommonOptions(program.command('server'))
     .option('--after <date>', 'Date after which to retrieve history')
     .option('--before <date>', 'Date before which to retrieve history')
     .action( async (serverId, opts) => {
-        crawler(opts, 'channel',
+        crawler(opts, 'server',
         [
             new ServerDiscordTask(serverId, opts.after, opts.before)
         ])

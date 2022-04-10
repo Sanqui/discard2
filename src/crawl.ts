@@ -56,6 +56,7 @@ export class Crawler {
     startMitmdump: boolean = true;
     headless: boolean;
     tasks: Task[];
+    browserDataDir: string | null;
     proxyServerAddress: string | null;
 
     constructor(params: CrawlerParams) {
@@ -68,6 +69,7 @@ export class Crawler {
         this.dataPath = (params.outputDir || 'out') + `/${this.jobName}`;
         this.captureTool = new params.captureTool(this.dataPath);
         this.headless = params.headless || false;
+        this.browserDataDir = params.browserDataDir;
         this.proxyServerAddress = params.proxyServerAddress;
     }
     
@@ -105,7 +107,7 @@ export class Crawler {
                 tasksQueued: [],
                 tasksFinished: []
             };
-            console.log("Initiated new job state");
+            console.log("Initiated new job state name " + this.jobName);
 
             await fs.mkdir(this.dataPath, { recursive: true });
         }
@@ -140,7 +142,7 @@ export class Crawler {
             //ignoreDefaultArgs: ["--enable-automation"],
 
             headless: this.headless,
-            userDataDir: process.env.BROWSER_DATA_DIR || undefined,
+            userDataDir: this.browserDataDir,
             env: {
                 ...process.env,
                 'TZ': 'Etc/UTC'
