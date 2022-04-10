@@ -2,11 +2,11 @@
 // Heavily hardcoded for Discord capture processing
 
 import { Buffer } from 'buffer';
-var equal = require('deep-equal');
+import equal from 'deep-equal';
 
 import brotli from 'brotli';
-import { gzip, ungzip } from 'node-gzip';
-var ZlibSync = require("zlib-sync");
+import { ungzip } from 'node-gzip';
+import ZlibSync = require("zlib-sync");
 
 export interface ReaderOutputHttp {
     type: "http",
@@ -18,7 +18,7 @@ export interface ReaderOutputHttp {
     },
     response: {
         status: number,
-        data: any
+        data: unknown
     }
 }
 
@@ -26,7 +26,7 @@ export interface ReaderOutputWs {
     type: "ws",
     timestamp: string,
     direction: "send" | "recv",
-    data: any
+    data: unknown
 }
 
 export type ReaderOutput = ReaderOutputHttp | ReaderOutputWs;
@@ -96,7 +96,7 @@ export class ProtocolHandler {
         this.httpConnections = new Map();
     }
 
-    async handleWebsocketPayload(isRequest: boolean,
+    handleWebsocketPayload(isRequest: boolean,
             buffer: Buffer,
             timestamp: string,
             flush: boolean = true
@@ -131,21 +131,21 @@ export class ProtocolHandler {
 
     async handleHttpStream(stream: HTTP2Stream) {
         function convertHeaders(headers) {
-            let result = {};
-            for (let header of headers) {
-                result[header['http2.header.name']] = header['http2.header.value'];
+            const result: {[key in string]: string} = {};
+            for (const header of headers) {
+                result[header['http2.header.name'] as string] = header['http2.header.value'] as string;
             }
             return result;
         }
         if (!stream.request[HTTP2FrameType.HEADERS]) {
-            console.log('Warning: No request headers in http2 stream ' + stream.id);
+            console.log(`Warning: No request headers in http2 stream ${stream.id}`);
             return;
         }
-        let requestHeaders = convertHeaders(stream.request[HTTP2FrameType.HEADERS]['http2.header']);
+        const requestHeaders = convertHeaders(stream.request[HTTP2FrameType.HEADERS]['http2.header']);
         if (stream.response[HTTP2FrameType.HEADERS] == undefined) {
-            throw new Error('No response headers in stream ' + stream.id);
+            throw new Error(`No response headers in stream ${stream.id}`);
         }
-        let responseHeaders = convertHeaders(stream.response[HTTP2FrameType.HEADERS]['http2.header']);
+        const responseHeaders = convertHeaders(stream.response[HTTP2FrameType.HEADERS]['http2.header']);
 
         if (requestHeaders[':authority'] != "discord.com") return;
         
@@ -168,9 +168,9 @@ export class ProtocolHandler {
         ) {
             throw new Error('No data in response in stream ' + stream.id);
         }
-        let responseBodyData = stream.response[HTTP2FrameType.DATA]['http2.body.fragments']['http2.body.reassembled.data'];
+        const responseBodyData = stream.response[HTTP2FrameType.DATA]['http2.body.fragments']['http2.body.reassembled.data'];
 
-        let responseDataBuffer = hexToBuffer(responseBodyData);
+        const responseDataBuffer = hexToBuffer(responseBodyData);
         let responseData: string;
         if (responseHeaders['content-encoding'] == "br") {
             responseData = Buffer.from(brotli.decompress(responseDataBuffer)).toString();
@@ -182,7 +182,7 @@ export class ProtocolHandler {
             throw Error("Unsupported content encoding: " + responseHeaders['content-encoding']);
         }
 
-        let responseDataJson: string;
+        let responseDataJson: unknown;
         if (requestHeaders[':path'].startsWith('/api/')) {
             responseDataJson = JSON.parse(responseData);
         }
@@ -205,18 +205,18 @@ export class ProtocolHandler {
         );
     }
 
-    async handlePacket(index: number, packet: any) {
-        let layers = packet._source.layers;
-        let timestamp = layers['frame']['frame.time_epoch'];
-        let frameNum = layers['frame']['frame.number'];
+    async handlePacket(index: number, packet: unknown) {
+        const layers = packet['_source']['layers'] as unknown;
+        const timestamp = layers['frame']['frame.time_epoch'] as string;
+        const frameNum = layers['frame']['frame.number'] as number;
     
-        if (layers.http && !layers.http2) {
+        if (layers['http'] && !layers['http2']) {
             // Discord uses HTTP only for initiating websockets
-            if (!layers.http[0]) return; // Possibly a proxy request
-            if (layers.http[0]['http.upgrade'] != 'websocket') return;
-            if (!layers.http[0]['http.response_for.uri'].startsWith('https://gateway.discord.gg/')) return;
+            if (!layers['http'][0]) return; // Possibly a proxy request
+            if (layers['http'][0]['http.upgrade'] != 'websocket') return;
+            if (!layers['http'][0]['http.response_for.uri'].startsWith('https://gateway.discord.gg/')) return;
     
-            this.discordWsStreamPort = layers.tcp['tcp.dstport'];
+            this.discordWsStreamPort = layers['tcp']['tcp.dstport'] as number;
     
             this.discordWsStreamInflator = new ZlibSync.Inflate();
     
@@ -224,15 +224,15 @@ export class ProtocolHandler {
             // which Wireshark fails to recognize, but we need the data
     
             // Skip the first 2 bytes
-            await this.handleWebsocketPayload(
+            this.handleWebsocketPayload(
                 false,
-                hexToBuffer(layers.http[1]['data']['data.data'].slice(6)),
+                hexToBuffer(layers['http'][1]['data']['data.data'].slice(6)),
                 timestamp
             );
         }
-        else if (layers.http2) {
-            let addrSrc: IPPort = {ip: layers.ip['ip.src'], port: layers.tcp['tcp.srcport']};
-            let addrDst: IPPort = {ip: layers.ip['ip.dst'], port: layers.tcp['tcp.dstport']};
+        else if (layers['http2']) {
+            const addrSrc: IPPort = {ip: layers['ip']['ip.src'] as string, port: layers['tcp']['tcp.srcport'] as number};
+            const addrDst: IPPort = {ip: layers['ip']['ip.dst'] as string, port: layers['tcp']['tcp.dstport'] as number};
             let httpConnection: HTTP2Connection;
             for (const [c, hc] of this.httpConnections) {
                 if (equal(c.addrClient, addrSrc) && equal(c.addrServer, addrDst)
@@ -242,14 +242,14 @@ export class ProtocolHandler {
                 }
             }
             if (!httpConnection) {
-                let connection = {addrClient: addrSrc, addrServer: addrDst};
+                const connection = {addrClient: addrSrc, addrServer: addrDst};
                 //this.log("New HTTP connection: " + JSON.stringify(connection));
                 httpConnection = new HTTP2Connection(connection);
                 this.httpConnections.set(connection, httpConnection);
             }
-            let isRequest = equal(addrSrc, httpConnection.connection.addrClient);
+            const isRequest = equal(addrSrc, httpConnection.connection.addrClient);
             // ridiculous what we have to do because of tshark output
-            let packet_streams = layers.http2;
+            let packet_streams = layers['http2'];
             let framesInPacket = [];
             if (packet_streams['http2.stream']) {
                 packet_streams = packet_streams['http2.stream'];
@@ -268,7 +268,7 @@ export class ProtocolHandler {
                     framesInPacket.push(stream);
                 }
             }
-            for (let frame of framesInPacket) {
+            for (const frame of framesInPacket) {
                 // TODO handle fragmented headers
                 const streamid = frame['http2.streamid'] as HTTP2FrameType;
                 const frameType = frame['http2.type'] as number;
@@ -286,11 +286,11 @@ export class ProtocolHandler {
                     httpConnection.streams[streamid].id = streamid;
                     httpConnection.streams[streamid].timestamp_start = timestamp;
                 }
-                let request = httpConnection.streams[streamid][isRequest ? 'request' : 'response'];
+                const request = httpConnection.streams[streamid][isRequest ? 'request' : 'response'];
                 if (request[frameType]) {
-                    throw new Error('Same frame type encountered multiple times for stream ' + streamid);
+                    throw new Error(`Same frame type encountered multiple times for stream ${streamid}`);
                 }
-                request[frameType] = frame;
+                request[frameType] = frame as unknown;
     
                 if (endStream && !isRequest) {
                     httpConnection.streams[streamid].timestamp_end = timestamp;
@@ -298,7 +298,7 @@ export class ProtocolHandler {
                     delete httpConnection.streams[streamid];
                 }
             }
-        } else if (layers.websocket) {
+        } else if (layers['websocket']) {
             // TODO verify host
             // TODO currently we expect the client to always send text data,
             // and the server to send binary data, but we should check the opcode
@@ -309,20 +309,20 @@ export class ProtocolHandler {
 
             if (!this.discordWsStreamPort) return;
 
-            let isRequest = layers.tcp['tcp.srcport'] == this.discordWsStreamPort;
+            const isRequest = layers['tcp']['tcp.srcport'] == this.discordWsStreamPort;
     
             //this.log(`${isRequest?">":"<"} i${index} f${frameNum} WS`);
             //this.log(layers);
     
-            let data = layers['websocket_data.data'];
+            const data = layers['websocket_data.data'] as string | [];
     
             if (data) {
                 if (Array.isArray(data) ) {
-                    for (let d of data) {
-                        await this.handleWebsocketPayload(isRequest, Buffer.from(d, 'hex'), timestamp);
+                    for (const d of data) {
+                        this.handleWebsocketPayload(isRequest, Buffer.from(d, 'hex'), timestamp);
                     }
                 } else {
-                    await this.handleWebsocketPayload(isRequest, Buffer.from(data, 'hex'), timestamp);
+                    this.handleWebsocketPayload(isRequest, Buffer.from(data, 'hex'), timestamp);
                 }
     
             }

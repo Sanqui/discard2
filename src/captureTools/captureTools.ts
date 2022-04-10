@@ -3,9 +3,9 @@ export class CaptureTool {
     proxyServerAddress: string | null;
     replay: boolean = false;
 
-    constructor(dataPath: string) {};
-    async start(): Promise<void> {};
-    async close(): Promise<void> {};
+    constructor(dataPath: string) {}
+    async start(): Promise<void> {}
+    close(): void {}
 }
 
 export class DummyCaptureTool extends CaptureTool {
@@ -15,7 +15,7 @@ export class DummyCaptureTool extends CaptureTool {
         console.log("Starting dummy capture tool")
     }
     
-    async close() {
+    close() {
         console.log("Closing dummy capture tool")
     }
 }

@@ -3,6 +3,7 @@ node_modules/
 warcprox/
 *.js
 !jest.config.js
+!.eslintrc.js
 out/
 out2/
 .env

@@ -1,9 +1,9 @@
-import { spawn } from 'child_process';
+import { spawn, ChildProcess } from 'child_process';
 
 import { CaptureTool } from './captureTools';
 
 export class Tshark extends CaptureTool {
-    process: any;
+    process: ChildProcess;
     filePath: string;
     closed: boolean;
     stderr: string;
@@ -15,20 +15,20 @@ export class Tshark extends CaptureTool {
     }
 
     async start() {
-        process.on('beforeExit', async () => {
-                await this.close();
+        process.on('beforeExit', () => {
+                this.close();
             }
         );
 
-        process.on('uncaughtExceptionMonitor', async () => {
-                await this.close();
+        process.on('uncaughtExceptionMonitor', () => {
+                this.close();
             }
         );
 
         console.log("Starting tshark");
         this.closed = false;
         this.stderr = "";
-        let args = [
+        const args = [
             '-w', this.filePath,
             // Capture all interfaces
             '-ni', 'any',
@@ -55,8 +55,8 @@ export class Tshark extends CaptureTool {
         
         await new Promise(r => setTimeout(r, 100));
 
-        if (this.process.exited) {
-            throw new Error(`tshark exited early with code ${this.process.code}\nstderr: ${this.stderr}\nstderr read: ${this.process.stderr.read().toString()}`);
+        if (this.process.exitCode) {
+            throw new Error(`tshark exited early with code ${this.process.exitCode}\nstderr: ${this.stderr}\nstderr read: ${this.process.stderr.read().toString()}`);
         } else {
             this.stderr += this.process.stderr.read();
             //this.process.stderr.on('data', data => {
@@ -72,10 +72,10 @@ export class Tshark extends CaptureTool {
         }
     }
 
-    async close() {
+    close() {
         if (!this.closed) {
             console.log("Stopping tshark");
-            await this.process.kill();
+            this.process.kill();
             this.closed = true;
         }
     }

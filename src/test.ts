@@ -102,7 +102,7 @@ test('runs a channel job against a replay', async () => {
     let state = JSON.parse(await fs.readFile(`${crawler.dataPath}/state.json`, 'utf8'));
     expect(state.jobFinished).toBeTruthy();
 
-    checkForMessages(crawler.dataPath, new Set(["testing 123", "300"]));
+    await checkForMessages(crawler.dataPath, new Set(["testing 123", "300"]));
 });
 
 test('runs a server job against a replay', async () => {
@@ -126,7 +126,7 @@ test('runs a server job against a replay', async () => {
     let state = JSON.parse(await fs.readFile(`${crawler.dataPath}/state.json`, 'utf8'));
     expect(state.jobFinished).toBeTruthy();
 
-    checkForMessages(crawler.dataPath, new Set(["testing 123", "300", "chat msg", "test message left in channel chat2"]));
+    await checkForMessages(crawler.dataPath, new Set(["testing 123", "300", "chat msg", "test message left in channel chat2"]));
 });
 
 // TODO add a test to read a real pcapng capture,

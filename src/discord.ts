@@ -36,7 +36,7 @@ export class LoginDiscordTask extends DiscordTask {
 
         await page.bringToFront();
 
-        let this_ = this;
+        const this_ = this;
         async function fillInLoginForm() {
             console.log("Filling in login form")
             await page.type('input[name="email"]', this_.discordEmail);
@@ -58,7 +58,7 @@ export class LoginDiscordTask extends DiscordTask {
         }
 
         await page.waitForSelector('div[class^="nameTag"]')
-        let nameTag = await page.$eval('div[class^="nameTag"]', el => el.textContent);
+        const nameTag = await page.$eval('div[class^="nameTag"]', el => el.textContent);
 
         console.log("Logged in: " + nameTag);
         await page.waitForTimeout(1000);
@@ -196,7 +196,7 @@ export class ChannelDiscordTask extends DiscordTask {
             await page.waitForSelector(resultsSelector);
 
             for (let i = 0; i < 10; i++) {
-                let resultsText = await page.$eval(resultsSelector, el => el.textContent);
+                const resultsText = await page.$eval(resultsSelector, el => el.textContent);
                 if (resultsText.trim() != "Searching…") {
                     return resultsText;
                 }
@@ -211,7 +211,7 @@ export class ChannelDiscordTask extends DiscordTask {
         );
         
         // Switch the order from oldest messages
-        let results_text = await performAndWaitForSearchResults(
+        const results_text = await performAndWaitForSearchResults(
             page.click(`div[aria-controls="oldest-tab"]`)
         );
 
@@ -223,15 +223,15 @@ export class ChannelDiscordTask extends DiscordTask {
         }
 
         const firstResultSelector = `#search-results > ul > li:first-of-type`;
-        let firstMessageId = await page.$eval(
+        const firstMessageId = await page.$eval(
             firstResultSelector,
             el => el.attributes['aria-labelledby'].value.split('-')[2]
-        );
+        ) as string;
 
         console.log(`ID of first message in search results: ${firstMessageId}`);
 
         if (this.after) {
-            if (firstMessageId < datetimeToDiscordSnowflake(this.after)) {
+            if (BigInt(firstMessageId) < BigInt(datetimeToDiscordSnowflake(this.after))) {
                 throw Error("First message ID is less than the after date");
             }
         }
@@ -255,11 +255,11 @@ export class ChannelDiscordTask extends DiscordTask {
 
         while (true) {
             const messageSelector = `ol[data-list-id="chat-messages"] li[id^="chat-messages"]`;
-            let messageIds = await page.$$eval(messageSelector, els => els.map(el => el.id.split('-')[2]));
-            let lastMessageId = messageIds[messageIds.length - 1];
+            const messageIds = await page.$$eval(messageSelector, els => els.map(el => el.id.split('-')[2]));
+            const lastMessageId = messageIds[messageIds.length - 1];
 
             if (this.before) {
-                if (lastMessageId >= datetimeToDiscordSnowflake(this.before)) {
+                if (BigInt(lastMessageId) >= BigInt(datetimeToDiscordSnowflake(this.before))) {
                     console.log(`We have reached the last message we are interested in (ID ${lastMessageId})`);
                     break;
                 }
@@ -323,7 +323,7 @@ export class ServerDiscordTask extends DiscordTask {
         // Make sure all categories are open  
 
         for await(const el of await page.$$('#channels ul li [class*="collapsed-"]')) {
-            el.click();
+            await el.click();
             // TODO await properly for the category to be expanded
             await page.waitForTimeout(200);
         }

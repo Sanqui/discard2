@@ -21,13 +21,13 @@ export class Reader {
         public outputFunction: (data: ReaderOutput) => void = null
     ) {}
 
-    async log(...args: any[]) {
+    log(...args: unknown[]) {
         if (this.verbose && (this.outputFormat == OutputFormats.PRINT || this.outputFunction)) {
             console.log(...args)
         }
     }
 
-    async output(data: ReaderOutput) {
+    output(data: ReaderOutput) {
         if (this.outputFunction) {
             this.outputFunction(data);
         } else {
@@ -38,17 +38,17 @@ export class Reader {
     }
 
     async read() {
-        let contents = await fs.readFile(`${this.path}/state.json`, 'utf8');
-        let state = JSON.parse(contents);
+        const contents = await fs.readFile(`${this.path}/state.json`, 'utf8');
+        const state = JSON.parse(contents);
     
         this.log(`Loaded job ${state.jobName}`);
 
-        let protocolHandler = new ProtocolHandler(
+        const protocolHandler = new ProtocolHandler(
             this.log.bind(this),
             this.output.bind(this)
         );
     
-        let args = [
+        const args = [
             // read capture file
             '-r', `${this.path}/capture.pcapng`,
             // use ssl keylog file to decrypt TLS
@@ -74,7 +74,7 @@ export class Reader {
     
         //this.log("tshark args:", args.join(' '));
     
-        let process = spawn('tshark', args);
+        const process = spawn('tshark', args);
         
         process.on('exit', code => {
             if (code != 0 && code != 255) {

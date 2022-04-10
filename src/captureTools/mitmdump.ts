@@ -1,7 +1,7 @@
-import { spawn } from 'child_process';
+import { spawn, ChildProcess } from 'child_process';
 import * as fs from 'fs';
 
-var tcpPortUsed = require('tcp-port-used');
+import tcpPortUsed = require('tcp-port-used');
 
 import { CaptureTool } from './captureTools';
 
@@ -31,9 +31,9 @@ export class Mitmdump extends CaptureTool {
     supportsReplay = true;
     proxyServerAddress = "127.0.0.1:8080";
 
-    process: any;
+    process: ChildProcess;
     filePath: string;
-    replay: boolean = false;;
+    replay = false;
     closed: boolean;
     mitmdumpPath: string;
 
@@ -56,13 +56,13 @@ export class Mitmdump extends CaptureTool {
         }
         this.closed = false;
 
-        process.on('beforeExit', async () => {
-                await this.close();
+        process.on('beforeExit', () => {
+                this.close();
             }
         );
 
-        process.on('uncaughtExceptionMonitor', async () => {
-                await this.close();
+        process.on('uncaughtExceptionMonitor', () => {
+                this.close();
             }
         );
 
@@ -87,14 +87,14 @@ export class Mitmdump extends CaptureTool {
         }*/
         // Quiet mitmdump produces no output, so wait
         // for it to pick itself up...
-        await new tcpPortUsed.waitUntilUsed(8080, 500, 4000)
+        await tcpPortUsed.waitUntilUsed(8080, 500, 4000)
         await new Promise(r => setTimeout(r, 2000));
     }
 
-    async close() {
+    close() {
         if (!this.closed) {
             console.log("Stopping mitmdump");
-            await this.process.kill();
+            this.process.kill();
             this.closed = true;
         }
     }
