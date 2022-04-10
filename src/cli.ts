@@ -61,7 +61,7 @@ async function crawler(opts, mode: string, tasks: Task[]) {
 addCommonOptions(program.command('profile'))
     .description('Log in and fetch profile information')
     .action( async (opts) => {
-        crawler(opts, 'profile', [])
+        await crawler(opts, 'profile', [])
     })
 
 
@@ -72,7 +72,7 @@ addCommonOptions(program.command('channel'))
     .option('--after <date>', 'Date after which to retrieve history')
     .option('--before <date>', 'Date before which to retrieve history')
     .action( async (serverId, channelId, opts) => {
-        crawler(opts, 'channel',
+        await crawler(opts, 'channel',
         [
             new ChannelDiscordTask(serverId, channelId, opts.after, opts.before)
         ])
@@ -84,7 +84,7 @@ addCommonOptions(program.command('server'))
     .option('--after <date>', 'Date after which to retrieve history')
     .option('--before <date>', 'Date before which to retrieve history')
     .action( async (serverId, opts) => {
-        crawler(opts, 'server',
+        await crawler(opts, 'server',
         [
             new ServerDiscordTask(serverId, opts.after, opts.before)
         ])
@@ -100,8 +100,8 @@ program.command('reader')
     )
     .option('--verbose', 'Be verbose')
     .action( async (jobPath, opts) => {
-        let reader = new Reader(jobPath, opts.verbose, opts.format);
-        reader.read();
+        const reader = new Reader(jobPath, opts.verbose, opts.format);
+        await reader.read();
     })
 
 
@@ -109,8 +109,8 @@ program.command('reader')
 // are annoying
 program.command('open-wireshark')
     .argument('<job-path>', 'Path to job directory')
-    .action( async (jobPath, opts) => {
-        let args = [
+    .action( async (jobPath: string, opts) => {
+        const args = [
             // read capture file
             '-r', `${jobPath}/capture.pcapng`,
             // use ssl keylog file to decrypt TLS

@@ -46,3 +46,9 @@ Or in Docker/Podman:
 docker build -f Containerfile -t discard2-test --target test .
 docker run --cap-add=NET_RAW --cap-add=NET_ADMIN  discard2-test
 ```
+
+## FAQ
+
+**Q:** Why is the account password included in the job state file?
+
+A: Because it is also included in the capture and cannot be removed unless you derive the capture.  This way it is more obvious.

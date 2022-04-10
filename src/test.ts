@@ -1,6 +1,6 @@
 import * as fs from 'fs/promises';
 
-import { Crawler } from './crawl';
+import { Crawler, State } from './crawl';
 import { DiscordProject, ProfileDiscordTask, ChannelDiscordTask, ServerDiscordTask } from './discord';
 import { DummyCaptureTool } from './captureTools/captureTools';
 import { Mitmdump, MitmdumpReplay } from './captureTools/mitmdump';
@@ -13,19 +13,19 @@ const TEST_DISCORD_PASSWORD = "9jVjMMp11QY1sMiJh87hDShqQ";
 jest.setTimeout(60_000);
 
 test('restarts mitmdump twice', async () => {
-    let mitmdump = new Mitmdump((await fs.mkdtemp("/tmp/discard2-test-")));
+    const mitmdump = new Mitmdump((await fs.mkdtemp("/tmp/discard2-test-")));
     await mitmdump.start();
-    await mitmdump.close();
+    mitmdump.close();
 
-    let mitmdump2 = new Mitmdump((await fs.mkdtemp("/tmp/discard2-test-")));
+    const mitmdump2 = new Mitmdump((await fs.mkdtemp("/tmp/discard2-test-")));
     await mitmdump2.start();
-    await mitmdump2.close();
+    mitmdump2.close();
 });
 
 test('starts and closes tshark', async () => {
-    let tshark = new Tshark((await fs.mkdtemp("/tmp/discard2-test-")));
+    const tshark = new Tshark((await fs.mkdtemp("/tmp/discard2-test-")));
     await tshark.start();
-    await tshark.close();
+    tshark.close();
 });
 
 test('initializes a crawler', async () => {
@@ -54,15 +54,15 @@ test('runs a profile job against a replay', async () => {
 
     await mitmdump.start();
     await crawler.run()
-    await mitmdump.close();
+    mitmdump.close();
 
-    let state = JSON.parse(await fs.readFile(`${crawler.dataPath}/state.json`, 'utf8'));
-    expect(state.jobFinished).toBeTruthy();
+    const state = JSON.parse(await fs.readFile(`${crawler.dataPath}/state.json`, 'utf8')) as State;
+    expect(state.job.completed).toBeTruthy();
 });
 
 async function checkForMessages(dataPath: string, expected: Set<string>) {
-    let seen = new Set<string>();
-    let reader = new Reader(dataPath, false, OutputFormats.JSONL,
+    const seen = new Set<string>();
+    const reader = new Reader(dataPath, false, OutputFormats.JSONL,
         (data: ReaderOutput) => {
             //console.log(data);
             if (data.type == "http"
@@ -70,7 +70,7 @@ async function checkForMessages(dataPath: string, expected: Set<string>) {
                 && data.request.url.includes("/messages")
                 && data.response.status == 200
             ) {
-                for (let message of expected) {
+                for (const message of expected) {
                     if (JSON.stringify(data.response.data).includes(message)) {
                         seen.add(message);
                     }
@@ -97,10 +97,10 @@ test('runs a channel job against a replay', async () => {
 
     await mitmdump.start();
     await crawler.run()
-    await mitmdump.close();
+    mitmdump.close();
 
-    let state = JSON.parse(await fs.readFile(`${crawler.dataPath}/state.json`, 'utf8'));
-    expect(state.jobFinished).toBeTruthy();
+    const state = JSON.parse(await fs.readFile(`${crawler.dataPath}/state.json`, 'utf8')) as State;
+    expect(state.job.completed).toBeTruthy();
 
     await checkForMessages(crawler.dataPath, new Set(["testing 123", "300"]));
 });
@@ -121,10 +121,10 @@ test('runs a server job against a replay', async () => {
 
     await mitmdump.start();
     await crawler.run()
-    await mitmdump.close();
+    mitmdump.close();
 
-    let state = JSON.parse(await fs.readFile(`${crawler.dataPath}/state.json`, 'utf8'));
-    expect(state.jobFinished).toBeTruthy();
+    const state = JSON.parse(await fs.readFile(`${crawler.dataPath}/state.json`, 'utf8')) as State;
+    expect(state.job.completed).toBeTruthy();
 
     await checkForMessages(crawler.dataPath, new Set(["testing 123", "300", "chat msg", "test message left in channel chat2"]));
 });

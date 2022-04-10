@@ -11,6 +11,8 @@ import { CaptureTool } from './captureTools/captureTools';
 
 puppeteer.use(StealthPlugin());
 
+const DISCARD_VERSION = '0.1.0';
+
 export class Task {
     async perform(page: puppeteer_types.Page): Promise<Task[] | void> {
         return [];
@@ -18,16 +20,29 @@ export class Task {
 }
 
 export type State = {
-    jobName: string,
-    jobMode: string,
-    jobStarted: Date,
-    jobSaved: Date | null,
-    jobFinished: Date | null,
-    captureToolName: string,
-    tasksQueued: Task[],
-    currentTask: Task | null,
-    tasksFinished: Task[],
-    tasksFailed: Task[],
+    datetimeSaved: string,
+    client: {
+        name: "discard2",
+        version: string,
+    },
+    job: {
+        datetimeStart: string,
+        datetimeEnd: string,
+        name: string,
+        completed: boolean,
+        error: boolean,
+    },
+    settings: {
+        captureToolName: string,
+        projectName: string,
+        startingTasks: Task[],
+    },
+    tasks: {
+        queued: Task[],
+        current: Task | null,
+        finished: Task[],
+        failed: Task[],
+    }
 }
 
 export interface Project {
@@ -53,7 +68,6 @@ export class Crawler {
     project: Project;
     dataPath: string;
     captureTool: CaptureTool;
-    startMitmdump: boolean = true;
     headless: boolean;
     tasks: Task[];
     browserDataDir: string | null;
@@ -74,7 +88,7 @@ export class Crawler {
     }
     
     async saveState() {
-        this.state.jobSaved = new Date();
+        this.state.datetimeSaved = new Date().toISOString();
         return await fs.writeFile(
             `${this.dataPath}/state.json`,
             JSON.stringify(this.state, null, 2),
@@ -83,34 +97,34 @@ export class Crawler {
     }
 
     async run() {
-        try {
-            throw new Error('Resuming a job is not currently implemented');
-            let contents = await fs.readFile(`${this.dataPath}/state.json`, 'utf8');
-            this.state = JSON.parse(contents);
-            assert.equal(this.state.jobName, this.jobName);
-            console.log("Restored job state");
-
-            if (this.state.currentTask) {
-                this.state.tasksQueued.unshift(this.state.currentTask);
-                this.state.currentTask = null;
-            }
-        } catch (error) {
-            this.state = {
-                jobName: this.jobName,
-                jobMode: this.mode,
-                jobStarted: new Date(),
-                jobSaved: null,
-                jobFinished: null,
+        this.state = {
+            datetimeSaved: null,
+            client: {
+                name: "discard2",
+                version: DISCARD_VERSION,
+            },
+            job: {
+                datetimeStart: new Date().toISOString(),
+                datetimeEnd: null,
+                name: this.jobName,
+                completed: false,
+                error: false,
+            },
+            settings: {
                 captureToolName: this.captureTool.constructor.name,
-                tasksFailed: [],
-                currentTask: null,
-                tasksQueued: [],
-                tasksFinished: []
-            };
-            console.log("Initiated new job state name " + this.jobName);
+                projectName: this.project.constructor.name,
+                startingTasks: []
+            },
+            tasks: {
+                queued: [],
+                current: null,
+                finished: [],
+                failed: [],
+            }
+        };
+        console.log("Initiated new job state name " + this.jobName);
 
-            await fs.mkdir(this.dataPath, { recursive: true });
-        }
+        await fs.mkdir(this.dataPath, { recursive: true });
 
         await this.captureTool.start()
 
@@ -121,9 +135,10 @@ export class Crawler {
         try {
             await fs.readFile("/.dockerenv");
             runningInDocker = true;
+            console.log("Running in Docker");
         } catch {}
 
-        let proxyServerAddress = this.proxyServerAddress ?? this.captureTool.proxyServerAddress;
+        const proxyServerAddress = this.proxyServerAddress ?? this.captureTool.proxyServerAddress;
 
         this.browser = await puppeteer.launch({
             args: [
@@ -155,47 +170,51 @@ export class Crawler {
         } catch {}
         
 
-        this.state.tasksQueued = [
+        this.state.tasks.queued = [
             ...this.project.initialTasks,
             ...this.tasks,
-            ...this.state.tasksQueued];
+            ...this.state.tasks.queued];
+        
+        this.state.settings.startingTasks = [...this.project.initialTasks];
 
-        while (this.state.tasksQueued.length > 0) {
-            const task = this.state.tasksQueued.shift();
-            this.state.currentTask = task;
-            this.saveState();
+        while (this.state.tasks.queued.length > 0) {
+            const task = this.state.tasks.queued.shift();
+            this.state.tasks.current = task;
+            await this.saveState();
 
-            console.log(`*** Task: ${task.constructor.name} (${this.state.tasksQueued.length} more)`);
+            console.log(`*** Task: ${task.constructor.name} (${this.state.tasks.queued.length} more)`);
 
             let newTasks: Task[] | void;
             try {
                 newTasks = await task.perform(page);
             } catch (error) {
-                console.log("Caught error while performing task: " + error);
+                console.log(`Caught error while performing task: ${error}`);
                 if (!this.headless) {
                     await pressAnyKey("Press any key to exit...");
                 }
                 await this.browser.close();
-                await this.captureTool.close();
+                this.captureTool.close();
+                this.state.job.error = true;
                 throw error;
             }
             if (newTasks) {
-                this.state.tasksQueued = [
+                this.state.tasks.queued = [
                     ...newTasks,
-                    ...this.state.tasksQueued
+                    ...this.state.tasks.queued
                 ]
             }
-            this.state.tasksFinished.push(task);
+            this.state.tasks.finished.push(task);
         }
 
-        this.state.currentTask = null;
+        this.state.tasks.current = null;
 
         console.log("All tasks completed")
-        this.state.jobFinished = new Date();
-        this.saveState();
+        this.state.job.datetimeEnd = new Date().toISOString();
+        this.state.job.completed = true;
+        await this.saveState();
 
         await this.browser.close();
-        await this.captureTool.close();
+        this.captureTool.close();
     }
 }
 
