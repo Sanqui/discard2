@@ -221,6 +221,9 @@ export class Crawler {
                 newTasks = await task.perform({log: this.log.bind(this) as LogFunction, page: page});
             } catch (error) {
                 await this.log(`Caught error while performing task: ${error}`);
+                const screenshotPath = `${this.dataPath}/error.png`;
+                await page.screenshot({path: screenshotPath});
+                await this.log(`Saved screenshot to ${screenshotPath}`);
                 if (!this.headless) {
                     await pressAnyKey("Press any key to exit...");
                 }
