@@ -18,6 +18,7 @@ export class Reader {
     constructor(
         public path: string,
         public verbose: boolean = false,
+        public debug: boolean = false,
         public outputFormat: OutputFormats = OutputFormats.PRINT,
         public outputFunction: (data: ReaderOutput) => void = null
     ) {}
@@ -25,6 +26,12 @@ export class Reader {
     log(...args: unknown[]) {
         if (this.verbose && (this.outputFormat == OutputFormats.PRINT || this.outputFunction)) {
             console.log(...args)
+        }
+    }
+
+    logDebug(...args: unknown[]) {
+        if (this.debug) {
+            console.log("DEBUG:", ...args)
         }
     }
 
@@ -46,6 +53,7 @@ export class Reader {
 
         const protocolHandler = new ProtocolHandler(
             this.log.bind(this),
+            this.logDebug.bind(this),
             this.output.bind(this)
         );
     

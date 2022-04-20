@@ -90,7 +90,8 @@ export class ProtocolHandler {
     discordWsStreamInflator: any;
 
     constructor(
-        public log: Function,
+        public log: (...args: unknown[]) => void,
+        public logDebug: (...args: unknown[]) => void,
         public output: (data: ReaderOutput) => void
     ) {
         this.httpConnections = new Map();
@@ -99,7 +100,7 @@ export class ProtocolHandler {
     handleWebsocketPayload(isRequest: boolean,
             buffer: Buffer,
             timestamp: string,
-            flush: boolean = true
+            flush = true
     ) {
         let data: string;
         if (isRequest) {
@@ -146,6 +147,8 @@ export class ProtocolHandler {
             throw new Error(`No response headers in stream ${stream.id}`);
         }
         const responseHeaders = convertHeaders(stream.response[HTTP2FrameType.HEADERS]['http2.header']);
+
+        this.log(requestHeaders[':authority'], requestHeaders[':path']);
 
         if (requestHeaders[':authority'] != "discord.com") return;
         
@@ -284,7 +287,7 @@ export class ProtocolHandler {
                     // tshark reassembles the complete data for us when the stream ends
                     continue;
                 }
-                //this.log(`${isRequest?">":"<"} i${index} f${frameNum} - frame, streamid ${streamid}, type ${frameType}, end ${endStream}`);
+                this.logDebug(`${isRequest?">":"<"} i${index} f${frameNum} - frame, streamid ${streamid}, type ${frameType}, end ${endStream}`);
     
                 if (httpConnection.streams[streamid] === undefined) {
                     httpConnection.streams[streamid] = new HTTP2Stream();
@@ -316,7 +319,7 @@ export class ProtocolHandler {
 
             const isRequest = layers['tcp']['tcp.srcport'] == this.discordWsStreamPort;
     
-            //this.log(`${isRequest?">":"<"} i${index} f${frameNum} WS`);
+            this.logDebug(`${isRequest?">":"<"} i${index} f${frameNum} WS`);
             //this.log(layers);
     
             const data = layers['websocket_data.data'] as string | [];

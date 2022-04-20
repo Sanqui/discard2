@@ -7,14 +7,20 @@ import StealthPlugin from 'puppeteer-extra-plugin-stealth'
 import pressAnyKey from 'press-any-key';
 
 import { CaptureTool } from './captureTools/captureTools';
-//import { Mitmdump } from './captureTools/mitmdump';
 
 puppeteer.use(StealthPlugin());
 
 const DISCARD_VERSION = '0.1.1';
 
+type LogFunction = (...args: unknown[]) => Promise<void>;
+
+export interface CrawlerInterface {
+    log: LogFunction;
+    page: puppeteer_types.Page;
+}
+
 export class Task {
-    async perform(page: puppeteer_types.Page): Promise<Task[] | void> {
+    async perform(crawler: CrawlerInterface): Promise<Task[] | void> {
         return [];
     }
 }
@@ -82,7 +88,7 @@ export class Crawler {
         this.tasks = params.tasks;
         this.mode = params.mode;
         // set job name to UTC timestamp
-        this.jobName = new Date().toISOString() + '-' + params.mode;
+        this.jobName = new Date().toISOString().replace(/[-:]/g, "").split(".")[0] + '-' + params.mode;
         this.dataPath = (params.outputDir || 'out') + `/${this.jobName}`;
         this.captureTool = new params.captureTool(this.dataPath);
         this.headless = params.headless || false;
@@ -96,6 +102,15 @@ export class Crawler {
         return await fs.writeFile(
             `${this.dataPath}/state.json`,
             JSON.stringify(this.state, null, 2),
+            'utf8'
+        );
+    }
+
+    async log(...args: unknown[]) {
+        console.log(...args);
+        return await fs.appendFile(
+            `${this.dataPath}/log.txt`,
+            `${new Date().toISOString()}: ${Array.from(args).join(' ')}\n`,
             'utf8'
         );
     }
@@ -126,9 +141,9 @@ export class Crawler {
                 failed: [],
             }
         };
-        console.log("Initiated new job state name " + this.jobName);
-
         await fs.mkdir(this.dataPath, { recursive: true });
+        await this.saveState();
+        await this.log("Initiated new job state name " + this.jobName);
 
         await this.captureTool.start()
 
@@ -139,7 +154,7 @@ export class Crawler {
         try {
             await fs.readFile("/.dockerenv");
             runningInDocker = true;
-            console.log("Running in Docker");
+            await this.log("Running in Docker");
         } catch {}
 
         const proxyServerAddress = this.proxyServerAddress ?? this.captureTool.proxyServerAddress;
@@ -199,13 +214,13 @@ export class Crawler {
             this.state.tasks.current = task;
             await this.saveState();
 
-            console.log(`*** Task: ${task.constructor.name} (${this.state.tasks.queued.length} more)`);
+            await this.log(`*** Task: ${task.constructor.name} (${this.state.tasks.queued.length} more)`);
 
             let newTasks: Task[] | void;
             try {
-                newTasks = await task.perform(page);
+                newTasks = await task.perform({log: this.log.bind(this) as LogFunction, page: page});
             } catch (error) {
-                console.log(`Caught error while performing task: ${error}`);
+                await this.log(`Caught error while performing task: ${error}`);
                 if (!this.headless) {
                     await pressAnyKey("Press any key to exit...");
                 }
@@ -227,7 +242,7 @@ export class Crawler {
 
         this.state.tasks.current = null;
 
-        console.log("All tasks completed")
+        await this.log("All tasks completed")
         this.state.job.datetimeEnd = new Date().toISOString();
         this.state.job.completed = true;
         await this.saveState();

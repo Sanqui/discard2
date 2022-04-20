@@ -2,7 +2,7 @@ import * as puppeteer_types from 'puppeteer';
 import dateFormat from "dateformat";
 
 import {retry, retryGoto, clickAndWaitForNavigation, getUrlsFromLinks, waitForAndClick, waitForUrlStartsWith} from './utils';
-import {Project, Task} from './crawl';
+import {Project, Task, CrawlerInterface, Crawler} from './crawl';
 
 const discord_url = new URL("https://discord.com/");
 
@@ -15,8 +15,8 @@ export class DiscordTask extends Task {
 
 export class InitialDiscordTask extends DiscordTask {
     type = "InitialDiscordTask";
-    async perform(page: puppeteer_types.Page) {
-        await retryGoto(page, discord_url);
+    async perform(crawler: CrawlerInterface) {
+        await retryGoto(crawler.page, discord_url);
     }
 }
 
@@ -29,58 +29,58 @@ export class LoginDiscordTask extends DiscordTask {
         super();
     }
 
-    async perform(page: puppeteer_types.Page) {
-        await page.bringToFront();
+    async perform(crawler: CrawlerInterface) {
+        await crawler.page.bringToFront();
         
-        await retryGoto(page, new URL("https://discord.com/login"));
+        await retryGoto(crawler.page, new URL("https://discord.com/login"));
 
-        await page.waitForSelector("#app-mount")
+        await crawler.page.waitForSelector("#app-mount")
 
-        await page.bringToFront();
+        await crawler.page.bringToFront();
 
         const this_ = this;
         async function fillInLoginForm() {
-            console.log("Filling in login form")
-            await page.type('input[name="email"]', this_.discordEmail);
-            await page.type('input[name="password"]', this_.discordPassword);
+            await crawler.log("Filling in login form")
+            await crawler.page.type('input[name="email"]', this_.discordEmail);
+            await crawler.page.type('input[name="password"]', this_.discordPassword);
 
 
             const captchaSelector = 'iframe[src*="captcha/"]';
             await Promise.race([
                 Promise.all([
-                    page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 10000}),
-                    page.click('button[type="submit"]')
+                    crawler.page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 10000}),
+                    crawler.page.click('button[type="submit"]')
                 ]),
-                page.waitForSelector(captchaSelector)
+                crawler.page.waitForSelector(captchaSelector)
             ]);
             
-            if (await page.$(captchaSelector)) {
+            if (await crawler.page.$(captchaSelector)) {
                 throw new Error("Captcha detected on login.  It is recommended you log into this account manually in a browser from the same IP.")
             }
         }
 
-        if (await page.$('form[class^="authBox"]')) {
+        if (await crawler.page.$('form[class^="authBox"]')) {
             await fillInLoginForm();
-        } else if (await page.$('[class*="chooseAccountAuthBox"]')) {
-            console.log("Encountered 'Choose an account' screen")
-            await page.click('[class*="chooseAccountAuthBox"] [class^="actions"] button[class*="lookLink"]')
+        } else if (await crawler.page.$('[class*="chooseAccountAuthBox"]')) {
+            await crawler.log("Encountered 'Choose an account' screen")
+            await crawler.page.click('[class*="chooseAccountAuthBox"] [class^="actions"] button[class*="lookLink"]')
 
             await fillInLoginForm();
 
-        } else if (await page.$('form[class^="nameTag"]')) {
-            console.log("Already logged in")
+        } else if (await crawler.page.$('form[class^="nameTag"]')) {
+            await crawler.log("Already logged in")
         }
 
-        await page.waitForSelector('div[class^="nameTag"]')
-        const nameTag = await page.$eval('div[class^="nameTag"]', el => el.textContent);
+        await crawler.page.waitForSelector('div[class^="nameTag"]')
+        const nameTag = await crawler.page.$eval('div[class^="nameTag"]', el => el.textContent);
 
-        console.log("Logged in: " + nameTag);
-        await page.waitForTimeout(1000);
+        await crawler.log("Logged in: " + nameTag);
+        await crawler.page.waitForTimeout(1000);
 
-        if (await page.$('form[class^="focusLock"]')) {
-            console.log("Modal detected, attempting to close")
-            await page.keyboard.press('Escape');
-            await page.waitForTimeout(1000);
+        if (await crawler.page.$('form[class^="focusLock"]')) {
+            await crawler.log("Modal detected, attempting to close")
+            await crawler.page.keyboard.press('Escape');
+            await crawler.page.waitForTimeout(1000);
         }
     }
 }
@@ -137,21 +137,21 @@ export class ProfileDiscordTask extends DiscordTask {
         return email;
     }
 
-    async perform(page: puppeteer_types.Page) {
-        await this._openSettings(page);
+    async perform(crawler: CrawlerInterface) {
+        await this._openSettings(crawler.page);
 
-        const email = await this._getEmail(page);
-        console.log("Email read as ", email);
+        const email = await this._getEmail(crawler.page);
+        await crawler.log("Email read as ", email);
         
         if (this.discordEmail) {
             if (email != this.discordEmail) {
                 throw new Error(`Email in profile doesn't match provided email (${this.discordEmail}).`)
             }
         } else {
-            console.log("No email to verify against.")
+            await crawler.log("No email to verify against.")
         }
 
-        await this._closeSettings(page);
+        await this._closeSettings(crawler.page);
     }
 }
 
@@ -202,27 +202,27 @@ export class ChannelDiscordTask extends DiscordTask {
         this.before = typeof before == "string" ? new Date(before) : before;
     }
 
-    async _openChannel(page: puppeteer_types.Page) {
-        await openServer(page, this.serverId);
+    async _openChannel(crawler: CrawlerInterface) {
+        await openServer(crawler.page, this.serverId);
 
         const channelLinkSelector = `#channels ul li [data-list-item-id=channels___${this.channelId}]`;
 
-        if (!await page.$(channelLinkSelector)) {
+        if (!await crawler.page.$(channelLinkSelector)) {
             throw Error(`Channel ID ${this.channelId} not found`);
         }
 
         // We need to scroll because of the "New unreads" indicator
 
-        await page.$eval(channelLinkSelector,
+        await crawler.page.$eval(channelLinkSelector,
             el => el.scrollIntoView({behavior: "smooth", block: "center", inline: "nearest"})
         );
 
         await retry(async () => {
-            await page.click(channelLinkSelector, { delay: 50 });
-            await page.waitForSelector(`[data-list-id="members-${this.channelId}"]`, { timeout: 200 });
+            await crawler.page.click(channelLinkSelector, { delay: 50 });
+            await crawler.page.waitForSelector(`[data-list-id="members-${this.channelId}"]`, { timeout: 200 });
         }, 10, "opening channel");
 
-        console.log(`Channel ${this.channelId} opened`)
+        await crawler.log(`Channel ${this.channelId} opened`)
     }
 
     async _pressCtrlF(page: puppeteer_types.Page) {
@@ -231,12 +231,12 @@ export class ChannelDiscordTask extends DiscordTask {
         await page.keyboard.up('Control');
     }
 
-    async _searchAndClickFirstResult(page: puppeteer_types.Page): Promise<string | void> {
-        await this._pressCtrlF(page);
+    async _searchAndClickFirstResult(crawler: CrawlerInterface): Promise<string | void> {
+        await this._pressCtrlF(crawler.page);
 
         async function typeDateFilter(name: string, date: Date) {
             if (date) {
-                const el = await page.$('div[aria-label="Search"]');
+                const el = await crawler.page.$('div[aria-label="Search"]');
                 await el.type(name + ':' + dateFormat(date, "yyyy-mm-dd"), {delay: 25});
             }
         }
@@ -251,25 +251,25 @@ export class ChannelDiscordTask extends DiscordTask {
 
             await action;
             while (!searchFinished) {
-                await page.waitForSelector(resultsSelector);
+                await crawler.page.waitForSelector(resultsSelector);
 
                 const interval = 200;
                 for (let i = 0; i < 10_000/interval; i++) {
-                    resultsText = await page.$eval(resultsSelector, el => el.textContent);
+                    resultsText = await crawler.page.$eval(resultsSelector, el => el.textContent);
                     if (!["Searching…", "Indexing…"].includes(resultsText.trim())) {
                         searchFinished = true;
                         break;
                     }
 
-                    await page.waitForTimeout(interval);
+                    await crawler.page.waitForTimeout(interval);
                 }
                 if (searchFinished) {
                     // We're either going to get the search results, or an error
                     const el = await Promise.race([
-                        page.waitForSelector('#search-results'),
-                        page.waitForSelector('section[class^="searchResults"] div[class^="emptyResults"]')
+                        crawler.page.waitForSelector('#search-results'),
+                        crawler.page.waitForSelector('section[class^="searchResults"] div[class^="emptyResults"]')
                     ])
-                    if (await page.$('#search-results')) {
+                    if (await crawler.page.$('#search-results')) {
                         // We got the results
                         return resultsText;
                     } else {
@@ -279,12 +279,12 @@ export class ChannelDiscordTask extends DiscordTask {
                             return resultsText;
                         } else {
                             const errorText = await el.evaluate(el => el.textContent);
-                            console.log("Discord returned error for search results: ", errorText);
-                            console.log("This likely signals rate limiting. Will wait for 5s.");
+                            await crawler.log("Discord returned error for search results: ", errorText);
+                            await crawler.log("This likely signals rate limiting. Will wait for 5s.");
                             searchFinished = false;
-                            await page.waitForTimeout(5000);
-                            await this._pressCtrlF(page);
-                            await page.keyboard.press('Enter');
+                            await crawler.page.waitForTimeout(5000);
+                            await this._pressCtrlF(crawler.page);
+                            await crawler.page.keyboard.press('Enter');
                         }
                     }
                 } else {
@@ -294,29 +294,29 @@ export class ChannelDiscordTask extends DiscordTask {
         }
 
         const results_text = await performAndWaitForSearchResults(
-            page.keyboard.press('Enter')
+            crawler.page.keyboard.press('Enter')
         );
 
-        console.log("Search results: " + results_text);
+        await crawler.log("Search results: " + results_text);
 
         if (results_text == "No Results") {
             // No search results match our criteria -- we're done scraping this channel
-            await page.click('[aria-label="Clear search"]');
+            await crawler.page.click('[aria-label="Clear search"]');
             return;
         }
         
         // Switch the order from oldest messages
         await performAndWaitForSearchResults(
-            page.click(`div[aria-controls="oldest-tab"]`)
+            crawler.page.click(`div[aria-controls="oldest-tab"]`)
         );
 
         const firstResultSelector = `#search-results > ul > li:first-of-type`;
-        const firstMessageId = await page.$eval(
+        const firstMessageId = await crawler.page.$eval(
             firstResultSelector,
             el => el.attributes['aria-labelledby'].value.split('-')[2]
         ) as string;
 
-        console.log(`ID of first message in search results: ${firstMessageId}`);
+        await crawler.log(`ID of first message in search results: ${firstMessageId}`);
 
         if (this.after) {
             if (BigInt(firstMessageId) < BigInt(datetimeToDiscordSnowflake(this.after))) {
@@ -325,19 +325,19 @@ export class ChannelDiscordTask extends DiscordTask {
         }
 
         // Reason we click the h2 is that there may be an embed image, link,
-        // or server and we don't that
-        await page.click(`${firstResultSelector} div[class^="contents"] h2`);
+        // or server and we don't want to hit that
+        await crawler.page.click(`${firstResultSelector} div[class^="contents"] h2`);
         
         // Wait for the message to show up
-        await page.waitForSelector(`#chat-messages-${firstMessageId}`);
+        await crawler.page.waitForSelector(`#chat-messages-${firstMessageId}`);
 
         // Close the search results
-        await page.click('[aria-label="Clear search"]');
+        await crawler.page.click('[aria-label="Clear search"]');
 
         return firstMessageId;
     }
 
-    async _scrollChat(page: puppeteer_types.Page) {
+    async _scrollChat(crawler: CrawlerInterface) {
         // scroll down and stop until we either hit the bottom or a message
         // that's after the after date
 
@@ -345,42 +345,42 @@ export class ChannelDiscordTask extends DiscordTask {
 
         while (true) {
             const messageSelector = `ol[data-list-id="chat-messages"] li[id^="chat-messages"]`;
-            const messageIds = await page.$$eval(messageSelector, els => els.map(el => el.id.split('-')[2]));
+            const messageIds = await crawler.page.$$eval(messageSelector, els => els.map(el => el.id.split('-')[2]));
             const lastMessageId = messageIds[messageIds.length - 1];
 
             if (this.before) {
                 if (BigInt(lastMessageId) >= BigInt(datetimeToDiscordSnowflake(this.before))) {
-                    console.log(`We have reached the last message we are interested in (ID ${lastMessageId})`);
+                    await crawler.log(`We have reached the last message we are interested in (ID ${lastMessageId})`);
                     break;
                 }
             }
 
-            if (!await page.$(`div[class^="jumpToPresentBar"`)) {
-                console.log(`We have reached the last message ("Jump to Present" bar is not present)`);
+            if (!await crawler.page.$(`div[class^="jumpToPresentBar"`)) {
+                await crawler.log(`We have reached the last message ("Jump to Present" bar is not present)`);
                 break;
             }
 
-            console.log(`Scrolling to last message (ID ${lastMessageId})...`)
-            await page.$eval(`#chat-messages-${lastMessageId}`,
+            await crawler.log(`Scrolling to last message (ID ${lastMessageId})...`)
+            await crawler.page.$eval(`#chat-messages-${lastMessageId}`,
                 el => el.scrollIntoView({ behavior: 'smooth', block: 'end'})
             );
-            await page.waitForTimeout(1_000);
+            await crawler.page.waitForTimeout(1_000);
             scrollTimes += 1;
         }
 
-        console.log(`Channel ${this.channelId} finished (scolled ${scrollTimes} times)`);
+        await crawler.log(`Channel ${this.channelId} finished (scolled ${scrollTimes} times)`);
     }
 
-    async perform(page: puppeteer_types.Page) {
-        await this._openChannel(page);
+    async perform(crawler: CrawlerInterface) {
+        await this._openChannel(crawler);
 
-        const firstMessageId = await this._searchAndClickFirstResult(page);
+        const firstMessageId = await this._searchAndClickFirstResult(crawler);
 
         if (!firstMessageId) return;
 
-        await this._scrollChat(page);
+        await this._scrollChat(crawler);
 
-        //await page.waitForTimeout(15_000);
+        //await crawler.page.waitForTimeout(15_000);
     }
 }
 
@@ -401,17 +401,17 @@ export class ServerDiscordTask extends DiscordTask {
         this.before = typeof before == "string" ? new Date(before) : before;
     }
 
-    async perform(page: puppeteer_types.Page) {
-        await openServer(page, this.serverId);
+    async perform(crawler: CrawlerInterface) {
+        await openServer(crawler.page, this.serverId);
         
         // Return a list of tasks for each channel
-        const channels = await page.$$('#channels ul li a[role="link"]');
+        const channels = await crawler.page.$$('#channels ul li a[role="link"]');
 
-        console.log(`Discovered ${channels.length} channels, creating tasks`);
+        await crawler.log(`Discovered ${channels.length} channels, creating tasks`);
         
         return await Promise.all(
             channels.map(async (el) => {
-                const channelId = await el.evaluate(el => el.attributes['data-list-item-id'].value.split('_')[3]);
+                const channelId = await el.evaluate(el => el.attributes['data-list-item-id'].value.split('_')[3]) as string;
                 return new ChannelDiscordTask(this.serverId, channelId, this.after, this.before);
             })
         );

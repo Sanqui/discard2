@@ -101,8 +101,9 @@ program.command('reader')
             .choices(['print', 'jsonl'])
     )
     .option('--verbose', 'Be verbose')
+    .option('--debug', 'Output debug information')
     .action( async (jobPath, opts) => {
-        const reader = new Reader(jobPath, opts.verbose, opts.format);
+        const reader = new Reader(jobPath, opts.verbose, opts.debug, opts.format);
         await reader.read();
     })
 
