@@ -1,5 +1,6 @@
 import * as puppeteer_types from 'puppeteer';
 import dateFormat from "dateformat";
+import cliProgress from 'cli-progress';
 
 import {retry, retryGoto, clickAndWaitForNavigation, getUrlsFromLinks, waitForAndClick, waitForUrlStartsWith} from './utils';
 import {Project, Task, CrawlerInterface, Crawler} from './crawl';
@@ -231,7 +232,7 @@ export class ChannelDiscordTask extends DiscordTask {
         await page.keyboard.up('Control');
     }
 
-    async _searchAndClickFirstResult(crawler: CrawlerInterface): Promise<string | void> {
+    async _searchAndClickFirstResult(crawler: CrawlerInterface): Promise<[string, number] | void> {
         await this._pressCtrlF(crawler.page);
 
         async function typeDateFilter(name: string, date: Date) {
@@ -293,17 +294,20 @@ export class ChannelDiscordTask extends DiscordTask {
             }
         }
 
-        const results_text = await performAndWaitForSearchResults(
+        const resultsText = await performAndWaitForSearchResults(
             crawler.page.keyboard.press('Enter')
         );
 
-        await crawler.log("Search results: " + results_text);
+        await crawler.log("Search results: " + resultsText);
 
-        if (results_text == "No Results") {
+        if (resultsText == "No Results") {
             // No search results match our criteria -- we're done scraping this channel
             await crawler.page.click('[aria-label="Clear search"]');
             return;
         }
+
+        const messageCount = parseInt(resultsText.split(" ")[0])
+        console.log(`Estimate to download ${messageCount} messages: `, Math.round(messageCount / 50 * 1.5 / 60), "minutes");
         
         // Switch the order from oldest messages
         await performAndWaitForSearchResults(
@@ -334,51 +338,66 @@ export class ChannelDiscordTask extends DiscordTask {
         // Close the search results
         await crawler.page.click('[aria-label="Clear search"]');
 
-        return firstMessageId;
+        return [firstMessageId, messageCount];
     }
 
-    async _scrollChat(crawler: CrawlerInterface) {
+    async _scrollChat(crawler: CrawlerInterface, messageCount: number) {
         // scroll down and stop until we either hit the bottom or a message
         // that's after the after date
 
         let scrollTimes = 0;
 
+        const startTime = new Date().getTime();
+        const bar1 = new cliProgress.SingleBar({}, cliProgress.Presets.shades_classic);
+        bar1.start(messageCount, 0);
+
+        let prevLastMessageId = null;
         while (true) {
             const messageSelector = `ol[data-list-id="chat-messages"] li[id^="chat-messages"]`;
             const messageIds = await crawler.page.$$eval(messageSelector, els => els.map(el => el.id.split('-')[2]));
             const lastMessageId = messageIds[messageIds.length - 1];
 
+            if (prevLastMessageId != lastMessageId) {
+                prevLastMessageId = lastMessageId;
+                scrollTimes++;
+                bar1.update(scrollTimes * 50);
+            }
+
             if (this.before) {
                 if (BigInt(lastMessageId) >= BigInt(datetimeToDiscordSnowflake(this.before))) {
+                    bar1.stop();
                     await crawler.log(`We have reached the last message we are interested in (ID ${lastMessageId})`);
                     break;
                 }
             }
 
             if (!await crawler.page.$(`div[class^="jumpToPresentBar"`)) {
+                bar1.stop();
                 await crawler.log(`We have reached the last message ("Jump to Present" bar is not present)`);
                 break;
             }
 
-            await crawler.log(`Scrolling to last message (ID ${lastMessageId})...`)
+            //await crawler.log(`Scrolling to last message (ID ${lastMessageId})...`)
             await crawler.page.$eval(`#chat-messages-${lastMessageId}`,
-                el => el.scrollIntoView({ behavior: 'smooth', block: 'end'})
+                el => el.scrollIntoView()
             );
-            await crawler.page.waitForTimeout(1_000);
-            scrollTimes += 1;
+            await crawler.page.waitForTimeout(200);
         }
+        const endTime = new Date().getTime();
 
-        await crawler.log(`Channel ${this.channelId} finished (scolled ${scrollTimes} times)`);
+        await crawler.log(`Channel ${this.channelId} finished (iterated ${scrollTimes} times, took ${(endTime - startTime) / 1000 / 60} minutes)`);
     }
 
     async perform(crawler: CrawlerInterface) {
         await this._openChannel(crawler);
 
-        const firstMessageId = await this._searchAndClickFirstResult(crawler);
+        const result = await this._searchAndClickFirstResult(crawler);
 
-        if (!firstMessageId) return;
+        if (!result) return;
+        
+        const [firstMessageId, messageCount] = result;
 
-        await this._scrollChat(crawler);
+        await this._scrollChat(crawler, messageCount);
 
         //await crawler.page.waitForTimeout(15_000);
     }
