@@ -306,7 +306,7 @@ export class ChannelDiscordTask extends DiscordTask {
             return;
         }
 
-        const messageCount = parseInt(resultsText.split(" ")[0])
+        const messageCount = parseInt(resultsText.split(" ")[0].replace(",", ""));
         console.log(`Estimate to download ${messageCount} messages: `, Math.round(messageCount / 50 * 1.5 / 60), "minutes");
         
         // Switch the order from oldest messages
