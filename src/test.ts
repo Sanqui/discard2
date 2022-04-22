@@ -5,7 +5,8 @@ import { DiscordProject, ProfileDiscordTask, ChannelDiscordTask, ServerDiscordTa
 import { DummyCaptureTool } from './captureTools/captureTools';
 import { Mitmdump, MitmdumpReplay } from './captureTools/mitmdump';
 import { Tshark } from './captureTools/tshark';
-import { Reader, OutputFormats, ReaderOutput } from './reader/reader';
+import { Reader, OutputFormats } from './reader/reader';
+import { ReaderOutput } from './reader/output';
 
 const TEST_DISCORD_EMAIL = "test_ahcae@protonmail.com";
 const TEST_DISCORD_PASSWORD = "9jVjMMp11QY1sMiJh87hDShqQ";
@@ -66,11 +67,12 @@ async function checkForMessages(dataPath: string, expected: Set<string>) {
     const seen = new Set<string>();
     const reader = new Reader(dataPath, false, false, OutputFormats.JSONL,
         (data: ReaderOutput) => {
+            console.log(data)
             //console.log(data);
             if (data.type == "http"
                 && data.request.method == "GET"
-                && data.request.url.includes("/messages")
-                && data.response.status == 200
+                && data.request.path.includes("/messages")
+                && data.response.status_code == 200
             ) {
                 for (const message of expected) {
                     if (JSON.stringify(data.response.data).includes(message)) {
@@ -133,6 +135,13 @@ test('runs a server job against a replay', async () => {
     console.log(`dataPath: ${crawler.dataPath}`);
 
     await checkForMessages(crawler.dataPath, new Set(
+        ["testing 123", "300", "chat msg", "test message left in channel chat2",
+        "message in last channel"]
+    ));
+});
+
+test('parse a mitmdump server capture', async () => {
+    await checkForMessages('./test_data/server/', new Set(
         ["testing 123", "300", "chat msg", "test message left in channel chat2",
         "message in last channel"]
     ));

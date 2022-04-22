@@ -1,6 +1,6 @@
 FROM fedora:36 AS build
 
-RUN dnf install -y wget wireshark-cli nodejs chromium make gcc g++
+RUN dnf install -y wget wireshark-cli nodejs chromium make gcc g++ python python-pip python-brotli
 
 RUN groupadd -r pptruser && useradd -r -g pptruser -G audio,video,wireshark pptruser \
     && mkdir -p /home/pptruser/Downloads \
@@ -13,6 +13,8 @@ RUN mkdir mitmproxy && cd mitmproxy \
   && mkdir -p /app/bin \
   && cp /mitmproxy/* /app/bin/ \
   && chown pptruser. -R /app
+
+RUN pip install mitmproxy==8.0.0
 
 WORKDIR /app
 

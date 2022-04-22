@@ -1,4 +1,4 @@
-// Protocol handler for reader
+// Tshark Protocol handler for reader
 // Heavily hardcoded for Discord capture processing
 
 import { Buffer } from 'buffer';
@@ -8,28 +8,7 @@ import brotli from 'brotli';
 import { ungzip } from 'node-gzip';
 import ZlibSync = require("zlib-sync");
 
-export interface ReaderOutputHttp {
-    type: "http",
-    timestamp_start: string,
-    timestamp_end: string,
-    request: {
-        method: string,
-        url: string,
-    },
-    response: {
-        status: number,
-        data: unknown
-    }
-}
-
-export interface ReaderOutputWs {
-    type: "ws",
-    timestamp: string,
-    direction: "send" | "recv",
-    data: unknown
-}
-
-export type ReaderOutput = ReaderOutputHttp | ReaderOutputWs;
+import { ReaderOutput } from '../output';
 
 enum WebsocketOpcode {
     CONTINUATION = 0x0,
@@ -84,7 +63,7 @@ function hexToBuffer(hex: string): Buffer {
     return Buffer.from(hex.replace(/:/g, ''), 'hex')
 }
 
-export class ProtocolHandler {
+export class TsharkProtocolHandler {
     httpConnections: Map<ConnectionIdentifier, HTTP2Connection>;
     discordWsStreamPort: number;
     discordWsStreamInflator: any;
@@ -198,10 +177,10 @@ export class ProtocolHandler {
                 "timestamp_start": stream.timestamp_start, "timestamp_end": stream.timestamp_end,
                 "request": {
                     "method": requestHeaders[':method'],
-                    "url": requestHeaders[':path'],
+                    "path": requestHeaders[':path'],
                 },
                 "response": {
-                    "status": parseInt(responseHeaders[':status']),
+                    "status_code": parseInt(responseHeaders[':status']),
                     "data": responseDataJson ?? responseData
                 }
             }
