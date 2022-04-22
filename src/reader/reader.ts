@@ -72,7 +72,7 @@ export class Reader {
             // output arrays instead of duplicate keys in json
             '--no-duplicate-keys',
             // specify the protocol data we want to see
-            '-j', 'frame ip tcp http data http2 http2.stream http2.header http2.body.fragments websocket',
+            '-j', 'frame sll ip tcp http data http2 http2.stream http2.header http2.body.fragments websocket',
             // flush stdout after each packet for more reliable piping
             '-l',
             // wireshark by default, for some ridiculous reason,

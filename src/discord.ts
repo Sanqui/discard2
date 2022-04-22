@@ -307,7 +307,7 @@ export class ChannelDiscordTask extends DiscordTask {
         }
 
         const messageCount = parseInt(resultsText.split(" ")[0].replace(",", ""));
-        console.log(`Estimate to download ${messageCount} messages: `, Math.round(messageCount / 50 * 1.5 / 60), "minutes");
+        console.log(`Estimate to download ${messageCount} messages: `, Math.round(messageCount / 50 * 0.75 / 60), "minutes");
         
         // Switch the order from oldest messages
         await performAndWaitForSearchResults(
@@ -385,7 +385,7 @@ export class ChannelDiscordTask extends DiscordTask {
         }
         const endTime = new Date().getTime();
 
-        await crawler.log(`Channel ${this.channelId} finished (iterated ${scrollTimes} times, took ${(endTime - startTime) / 1000 / 60} minutes)`);
+        await crawler.log(`Channel ${this.channelId} finished (scrolled ${scrollTimes} times, took ${(endTime - startTime) / 1000 / 60} minutes)`);
     }
 
     async perform(crawler: CrawlerInterface) {

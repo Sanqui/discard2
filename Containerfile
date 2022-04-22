@@ -8,7 +8,7 @@ RUN groupadd -r pptruser && useradd -r -g pptruser -G audio,video,wireshark pptr
 
 # Download mitmdump
 RUN mkdir mitmproxy && cd mitmproxy \
-  && wget -q https://snapshots.mitmproxy.org/7.0.4/mitmproxy-7.0.4-linux.tar.gz -O mitmproxy.tar.gz \
+  && wget -q https://snapshots.mitmproxy.org/8.0.0/mitmproxy-8.0.0-linux.tar.gz -O mitmproxy.tar.gz \
   && tar xf mitmproxy.tar.gz && rm mitmproxy.tar.gz && cd - \
   && mkdir -p /app/bin \
   && cp /mitmproxy/* /app/bin/ \

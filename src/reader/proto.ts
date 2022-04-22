@@ -213,6 +213,14 @@ export class ProtocolHandler {
         const timestamp = layers['frame']['frame.time_epoch'] as string;
         const frameNum = layers['frame']['frame.number'] as number;
 
+        let isRequest = false;
+        if (layers['sll']['sll.hatype'] == "772") {
+            // loopback
+            isRequest = layers['tcp']['tcp.dstport'] == '8080';
+        } else {
+            isRequest = layers['sll']['sll.pkttype'] == '4'; // Packet type: "Sent by us"
+        }
+
         if (layers['tcp']['tcp.analysis.lost_segment']) {
             this.log(`Warning: tshark reports lost TCP segment: ${timestamp} ${index} ${frameNum}`);
             return;
@@ -250,12 +258,15 @@ export class ProtocolHandler {
                 }
             }
             if (!httpConnection) {
-                const connection = {addrClient: addrSrc, addrServer: addrDst};
+                const connection = {
+                    addrClient: isRequest ? addrSrc : addrDst,
+                    addrServer: isRequest ? addrDst : addrSrc
+                };
                 //this.log("New HTTP connection: " + JSON.stringify(connection));
                 httpConnection = new HTTP2Connection(connection);
                 this.httpConnections.set(connection, httpConnection);
             }
-            const isRequest = equal(addrSrc, httpConnection.connection.addrClient);
+            //this.logDebug(`${isRequest?">":"<"} i${index} f${frameNum} http2`);
             // ridiculous what we have to do because of tshark output
             let packet_streams = layers['http2'];
             let framesInPacket = [];
@@ -287,7 +298,7 @@ export class ProtocolHandler {
                     // tshark reassembles the complete data for us when the stream ends
                     continue;
                 }
-                this.logDebug(`${isRequest?">":"<"} i${index} f${frameNum} - frame, streamid ${streamid}, type ${frameType}, end ${endStream}`);
+                this.logDebug(`${isRequest?">":"<"} i${index} f${frameNum} - http2 frame, streamid ${streamid}, type ${frameType}, end ${endStream}`);
     
                 if (httpConnection.streams[streamid] === undefined) {
                     httpConnection.streams[streamid] = new HTTP2Stream();
@@ -316,8 +327,6 @@ export class ProtocolHandler {
             // TODO verify for "fin" flag
 
             if (!this.discordWsStreamPort) return;
-
-            const isRequest = layers['tcp']['tcp.srcport'] == this.discordWsStreamPort;
     
             this.logDebug(`${isRequest?">":"<"} i${index} f${frameNum} WS`);
             //this.log(layers);
