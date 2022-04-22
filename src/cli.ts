@@ -98,7 +98,7 @@ program.command('reader')
     .argument('<job-path>', 'Path to job directory')
     .addOption(
         new Option('-f, --format <format>', 'Output format')
-            .choices(['print', 'jsonl'])
+            .choices(['print', 'jsonl', 'elasticsearch'])
     )
     .option('--verbose', 'Be verbose')
     .option('--debug', 'Output debug information')
