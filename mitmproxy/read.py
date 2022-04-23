@@ -13,7 +13,10 @@ with open(sys.argv[1], "rb") as logfile:
     try:
         for f in freader.stream():
             if isinstance(f, http.HTTPFlow):
-                if (f.request.host != 'discord.com'):
+                if not f.response:
+                    continue
+                
+                if f.request.host != 'discord.com':
                     continue
 
                 skip_paths = ['/assets/', '/cdn-cgi/', '/login', '/api/v9/science']
