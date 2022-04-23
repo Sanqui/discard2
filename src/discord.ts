@@ -330,7 +330,13 @@ export class ChannelDiscordTask extends DiscordTask {
 
         // Reason we click the h2 is that there may be an embed image, link,
         // or server and we don't want to hit that
-        await crawler.page.click(`${firstResultSelector} div[class^="contents"] h2`);
+        const h2Selector = `${firstResultSelector} div[class^="contents"] h2`
+        if (await crawler.page.$(h2Selector)) {
+            await crawler.page.click(`${firstResultSelector} div[class^="contents"] h2`);
+        } else {
+            // This may be a join or other type of system message, click on the icon to open the message
+            await crawler.page.click(`${firstResultSelector} div[class^="contents"] div[class^="iconContainer"]`);
+        }
         
         // Wait for the message to show up
         await crawler.page.waitForSelector(`#chat-messages-${firstMessageId}`);
@@ -345,6 +351,8 @@ export class ChannelDiscordTask extends DiscordTask {
         // scroll down and stop until we either hit the bottom or a message
         // that's after the after date
 
+        const chatSelector = `div[class^="chat"]`;
+
         let scrollTimes = 0;
 
         const startTime = new Date().getTime();
@@ -353,7 +361,7 @@ export class ChannelDiscordTask extends DiscordTask {
 
         let prevLastMessageId = null;
         while (true) {
-            const messageSelector = `ol[data-list-id="chat-messages"] li[id^="chat-messages"]`;
+            const messageSelector = `${chatSelector} ol[data-list-id="chat-messages"] li[id^="chat-messages"]`;
             const messageIds = await crawler.page.$$eval(messageSelector, els => els.map(el => el.id.split('-')[2]));
             const lastMessageId = messageIds[messageIds.length - 1];
 
