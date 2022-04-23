@@ -233,6 +233,13 @@ export class ChannelDiscordTask extends DiscordTask {
             await crawler.page.waitForSelector(`[data-list-id="members-${this.channelId}"]`, { timeout: 200 });
         }, 10, "opening channel");
 
+        if (await crawler.page.$(`div[class^="chat"] div[class*="gatedContent"]`)) {
+            await crawler.log('Hit "Age-Restricted Channel message, continuing...');
+            await crawler.page.click(`div[class^="chat"] div[class*="gatedContent"] button:nth-of-type(2)`);
+            await crawler.page.waitForTimeout(100);
+
+        }
+
         await crawler.log(`Channel ${this.channelId} opened`)
     }
 
@@ -353,6 +360,9 @@ export class ChannelDiscordTask extends DiscordTask {
 
         // Close the search results
         await crawler.page.click('[aria-label="Clear search"]');
+
+        // "You're viewing older messages" doesn't always show up immediately
+        await crawler.page.waitForTimeout(100);
 
         return [firstMessageId, messageCount];
     }
