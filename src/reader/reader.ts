@@ -50,7 +50,8 @@ export class Reader {
                     && data.response.status_code == 200
                 ) {
                     for (const message of data.response.data as any[]) {
-                        const id = `${this.state.job.name}-${message['id']}`;
+                        //const id = `${this.state.job.name}-${message['id']}`;
+                        const id = `${message['id']}`;
                         console.log(JSON.stringify({
                             index: {
                                 _index: "discord_messages",

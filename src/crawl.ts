@@ -10,7 +10,7 @@ import { CaptureTool } from './captureTools/captureTools';
 
 puppeteer.use(StealthPlugin());
 
-const DISCARD_VERSION = '0.1.1';
+const DISCARD_VERSION = '0.1.2';
 
 type LogFunction = (...args: unknown[]) => Promise<void>;
 
@@ -43,6 +43,7 @@ export type State = {
         captureToolName: string,
         projectName: string,
         startingTasks: Task[],
+        blockImages: boolean,
     },
     tasks: {
         queued: Task[],
@@ -132,7 +133,8 @@ export class Crawler {
             settings: {
                 captureToolName: this.captureTool.constructor.name,
                 projectName: this.project.constructor.name,
-                startingTasks: []
+                startingTasks: [],
+                blockImages: this.blockImages
             },
             tasks: {
                 queued: [],

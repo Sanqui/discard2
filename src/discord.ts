@@ -379,7 +379,7 @@ export class ChannelDiscordTask extends DiscordTask {
 
             //await crawler.log(`Scrolling to last message (ID ${lastMessageId})...`)
             await crawler.page.$eval(`#chat-messages-${lastMessageId}`,
-                el => el.scrollIntoView()
+                el => el.scrollIntoView({block: 'end'})
             );
             await crawler.page.waitForTimeout(200);
         }
