@@ -45,7 +45,7 @@ function addCommonOptions(command: Command) {
     ;
 }
 
-async function crawler(opts, mode: string, tasks: Task[]) {
+async function crawler(opts, mode: string, tasks: Task[], resume?: string) {
     const crawler = new Crawler({
         project: new DiscordProject(opts.email, opts.password),
         tasks: tasks,
@@ -54,6 +54,7 @@ async function crawler(opts, mode: string, tasks: Task[]) {
         captureTool: captureTools[opts.captureTool],
         headless: opts.headless,
         blockImages: opts.blockImages,
+        resume: resume
     });
 
     await crawler.run();
@@ -92,6 +93,14 @@ addCommonOptions(program.command('server'))
         ])
     });
 
+
+addCommonOptions(program.command('resume'))
+    .description('Resume an interrupted job')
+    .argument('<path>', 'Job path')
+    .action( async (path, opts) => {
+        await crawler(opts, 'resume',
+        [], path)
+    });
 
 program.command('reader')
     .description('Read completed job')

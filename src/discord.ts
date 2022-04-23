@@ -317,7 +317,7 @@ export class ChannelDiscordTask extends DiscordTask {
         }
 
         const messageCount = parseInt(resultsText.split(" ")[0].replace(",", ""));
-        console.log(`Estimate to download ${messageCount} messages: `, Math.round(messageCount / 50 * 0.75 / 60), "minutes");
+        await crawler.log(`Estimate to download ${messageCount} messages: `, Math.round(messageCount / 50 * 0.75 / 60), "minutes");
         
         // Switch the order from oldest messages
         await performAndWaitForSearchResults(
@@ -478,6 +478,12 @@ export class ServerDiscordTask extends DiscordTask {
     
 
 export class DiscordProject implements Project {
+    taskClasses = {
+        InitialDiscordTask: InitialDiscordTask,
+        LoginDiscordTask: LoginDiscordTask,
+        ChannelDiscordTask: ChannelDiscordTask,
+        ServerDiscordTask: ServerDiscordTask,
+    };
     initialTasks: Task[];
 
     constructor(discordEmail: string, discordPassword: string) {

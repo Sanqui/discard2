@@ -20,6 +20,8 @@ export interface CrawlerInterface {
 }
 
 export class Task {
+    type: string;
+
     async perform(crawler: CrawlerInterface): Promise<Task[] | void> {
         return [];
     }
@@ -40,6 +42,7 @@ export type State = {
         errorMessage?: string,
     },
     settings: {
+        resume: string,
         captureToolName: string,
         projectName: string,
         startingTasks: Task[],
@@ -54,6 +57,9 @@ export type State = {
 }
 
 export interface Project {
+    taskClasses: {
+        [type: string]: any,
+    };
     initialTasks: Task[], // runs even after restart
 }
 
@@ -66,7 +72,8 @@ interface CrawlerParams {
     headless?: boolean,
     captureTool: typeof CaptureTool,
     proxyServerAddress?: string,
-    blockImages?: boolean
+    blockImages?: boolean,
+    resume?: string,
 }
 
 export class Crawler {
@@ -82,6 +89,7 @@ export class Crawler {
     browserDataDir: string | null;
     proxyServerAddress: string | null;
     blockImages?: boolean;
+    resume: string
 
     constructor(params: CrawlerParams) {
         this.project = params.project;
@@ -96,6 +104,7 @@ export class Crawler {
         this.browserDataDir = params.browserDataDir;
         this.proxyServerAddress = params.proxyServerAddress;
         this.blockImages = params.blockImages;
+        this.resume = params.resume;
     }
     
     async saveState() {
@@ -131,21 +140,39 @@ export class Crawler {
                 error: false,
             },
             settings: {
+                resume: this.resume,
                 captureToolName: this.captureTool.constructor.name,
                 projectName: this.project.constructor.name,
                 startingTasks: [],
                 blockImages: this.blockImages
             },
             tasks: {
-                queued: [],
-                current: null,
                 finished: [],
                 failed: [],
+                current: null,
+                queued: [],
             }
         };
         await fs.mkdir(this.dataPath, { recursive: true });
         await this.saveState();
         await this.log("Initiated new job state name " + this.jobName);
+        if (this.resume) {
+            await this.log("Resuming from " + this.resume);
+
+            const resumeState = JSON.parse(await fs.readFile(`${this.resume}/state.json`, 'utf8')) as State;
+
+            for (const taskObj of [resumeState.tasks.current, ...resumeState.tasks.queued]) {
+                const task = new this.project.taskClasses[taskObj.type];
+                for (const key in taskObj) {
+                    if (key !== 'type') {
+                        task[key] = taskObj[key];
+                    }
+                }
+                this.state.tasks.queued.push(task);
+            }
+
+            await this.log(`Queued ${this.state.tasks.queued.length} tasks from resumed job`);
+        }
 
         await this.captureTool.start()
 
