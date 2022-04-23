@@ -77,3 +77,31 @@ export async function waitForUrlStartsWith(page: puppeteer.Page, url: string) {
 //        await page.waitForTimeout(200);
 //    }
 //}
+
+
+export async function scrollToTop(page: puppeteer.Page, selector: string) {
+    while (await page.$eval(selector, el => el.scrollTop > 0)) {
+        await page.$eval(selector,
+            el => el.scrollBy(0, -300)
+        );
+        await page.waitForTimeout(300);
+    }
+}
+
+export async function scrollToBottom(
+    page: puppeteer.Page, selector: string,
+    func: () => Promise<boolean | void>
+) {
+    if (await func()) {
+        return;
+    }
+    while (await page.$eval(selector, el => el.scrollTop + el.clientHeight < el.scrollHeight)) {
+        await page.$eval(selector,
+            el => el.scrollBy(0, 300)
+        );
+        await page.waitForTimeout(300);
+        if (await func()) {
+            break;
+        }
+    }
+}

@@ -2,7 +2,7 @@ import * as puppeteer_types from 'puppeteer';
 import dateFormat from "dateformat";
 import cliProgress from 'cli-progress';
 
-import {retry, retryGoto, clickAndWaitForNavigation, getUrlsFromLinks, waitForAndClick, waitForUrlStartsWith} from './utils';
+import {retry, retryGoto, clickAndWaitForNavigation, getUrlsFromLinks, waitForAndClick, waitForUrlStartsWith, scrollToTop, scrollToBottom} from './utils';
 import {Project, Task, CrawlerInterface, Crawler} from './crawl';
 
 const discord_url = new URL("https://discord.com/");
@@ -207,6 +207,16 @@ export class ChannelDiscordTask extends DiscordTask {
         await openServer(crawler.page, this.serverId);
 
         const channelLinkSelector = `#channels ul li [data-list-item-id=channels___${this.channelId}]`;
+
+        if (!await crawler.page.$(channelLinkSelector)) {
+            await scrollToTop(crawler.page, `#channels`);
+
+            await scrollToBottom(crawler.page, `#channels`,
+                async () => {
+                    return !!await crawler.page.$(channelLinkSelector);
+                }
+            );
+        }
 
         if (!await crawler.page.$(channelLinkSelector)) {
             throw Error(`Channel ID ${this.channelId} not found`);
@@ -420,7 +430,6 @@ export class ChannelDiscordTask extends DiscordTask {
     }
 }
 
-
 export class ServerDiscordTask extends DiscordTask {
     type = "ServerDiscordTask";
     after?: Date;
@@ -441,15 +450,28 @@ export class ServerDiscordTask extends DiscordTask {
         await openServer(crawler.page, this.serverId);
         
         // Return a list of tasks for each channel
-        const channels = await crawler.page.$$('#channels ul li a[role="link"]');
+        // Discord loads channels dynamically, so we have to scroll through the list to see them all
 
-        await crawler.log(`Discovered ${channels.length} channels, creating tasks`);
+        await scrollToTop(crawler.page, `#channels`);
+
+        const channelIds: string[] = [];
+
+        await scrollToBottom(crawler.page, `#channels`,
+            async () => {
+                const channelEls = await crawler.page.$$('#channels ul li a[role="link"]');
+                for (const el of channelEls) {
+                    const channelId = await el.evaluate(el => el.attributes['data-list-item-id'].value.split('_')[3]) as string;
+                    if (channelIds.indexOf(channelId) == -1) {
+                        channelIds.push(channelId);
+                    }
+                }
+            }
+        );
+
+        await crawler.log(`Discovered ${channelIds.length} channels, creating tasks`);
         
-        return await Promise.all(
-            channels.map(async (el) => {
-                const channelId = await el.evaluate(el => el.attributes['data-list-item-id'].value.split('_')[3]) as string;
-                return new ChannelDiscordTask(this.serverId, channelId, this.after, this.before);
-            })
+        return channelIds.map(
+            el => new ChannelDiscordTask(this.serverId, el, this.after, this.before)
         );
     }
 }
