@@ -360,6 +360,7 @@ export class ChannelDiscordTask extends DiscordTask {
         bar1.start(messageCount, 0);
 
         let prevLastMessageId = null;
+        let jigglePhase = false;
         while (true) {
             const messageSelector = `${chatSelector} ol[data-list-id="chat-messages"] li[id^="chat-messages"]`;
             const messageIds = await crawler.page.$$eval(messageSelector, els => els.map(el => el.id.split('-')[2]));
@@ -386,8 +387,16 @@ export class ChannelDiscordTask extends DiscordTask {
             }
 
             //await crawler.log(`Scrolling to last message (ID ${lastMessageId})...`)
+            let scrollFunc = (el: Element) => el.scrollIntoView(true);
+            if (prevLastMessageId == lastMessageId) {
+                // If we're stuck on the same message, jiggle the scroll
+                if (jigglePhase) {
+                    scrollFunc = (el: Element) => el.scrollIntoView(false);
+                }
+                jigglePhase = !jigglePhase;
+            }
             await crawler.page.$eval(`#chat-messages-${lastMessageId}`,
-                el => el.scrollIntoView({block: 'end'})
+                scrollFunc
             );
             await crawler.page.waitForTimeout(200);
         }

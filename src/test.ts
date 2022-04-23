@@ -67,7 +67,6 @@ async function checkForMessages(dataPath: string, expected: Set<string>) {
     const seen = new Set<string>();
     const reader = new Reader(dataPath, false, false, OutputFormats.JSONL,
         (data: ReaderOutput) => {
-            console.log(data)
             //console.log(data);
             if (data.type == "http"
                 && data.request.method == "GET"
