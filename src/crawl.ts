@@ -191,7 +191,7 @@ export class Crawler {
         this.browser = await puppeteer.launch({
             args: [
                 proxyServerAddress ? `--proxy-server=${proxyServerAddress}` : '',
-                '--ignore-certificate-errors',
+                proxyServerAddress ? '--ignore-certificate-errors' : '',
                 '--disable-gpu',
                 '--force-prefers-reduced-motion',
                 runningInDocker ? '--no-sandbox' : '',

@@ -95,7 +95,6 @@ export class TsharkProtocolHandler {
         }
 
         if (data) {
-            this.log(` .WS ${isRequest?">":"<"} ` + data.slice(0, 80) + "...");
             this.output(
                 {
                     "type": "ws",
@@ -104,8 +103,6 @@ export class TsharkProtocolHandler {
                     "data": JSON.parse(data)
                 }
             );
-        } else {
-            this.log(` .WS ${isRequest?">":"<"} `);
         }
     }
 
@@ -127,8 +124,6 @@ export class TsharkProtocolHandler {
         }
         const responseHeaders = convertHeaders(stream.response[HTTP2FrameType.HEADERS]['http2.header']);
 
-        this.log(requestHeaders[':authority'], requestHeaders[':path']);
-
         if (requestHeaders[':authority'] != "discord.com") return;
         
         if (requestHeaders[':path'].startsWith('/assets/')
@@ -138,9 +133,6 @@ export class TsharkProtocolHandler {
         ) {
             return;
         }
-
-        this.log(`> ${requestHeaders[':method']} ${requestHeaders[':path']}`);
-        this.log(`< ${responseHeaders[':status']} (${responseHeaders['content-encoding'] || ''})`);
 
         if (responseHeaders[':status'] != '200') return;
 
@@ -169,8 +161,6 @@ export class TsharkProtocolHandler {
             responseDataJson = JSON.parse(responseData);
         }
 
-        //this.log(" " + responseData);
-        this.log(" " + responseData.slice(0, 80) + "...");
         this.output(
             {
                 "type": "http",

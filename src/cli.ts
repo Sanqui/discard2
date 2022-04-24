@@ -109,7 +109,6 @@ program.command('reader')
         new Option('-f, --format <format>', 'Output format')
             .choices(['print', 'jsonl', 'elasticsearch'])
     )
-    .option('--verbose', 'Be verbose')
     .option('--debug', 'Output debug information')
     .action( async (jobPath, opts) => {
         const reader = new Reader(jobPath, opts.verbose, opts.debug, opts.format);

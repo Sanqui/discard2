@@ -12,6 +12,7 @@ export enum OutputFormats {
     PRINT = 'print',
     JSONL = 'jsonl',
     ELASTICSEARCH = 'elasticsearch',
+    DERIVE_URLS = 'derive-urls'
 }
 
 export class Reader {
@@ -19,14 +20,13 @@ export class Reader {
 
     constructor(
         public path: string,
-        public verbose: boolean = false,
         public debug: boolean = false,
         public outputFormat: OutputFormats = OutputFormats.PRINT,
         public outputFunction: (data: ReaderOutput) => void = null
     ) {}
 
     log(...args: unknown[]) {
-        if (this.verbose && (this.outputFormat == OutputFormats.PRINT || this.outputFunction)) {
+        if (this.outputFormat == OutputFormats.PRINT) {
             console.log(...args)
         }
     }
@@ -41,7 +41,24 @@ export class Reader {
         if (this.outputFunction) {
             this.outputFunction(data);
         } else {
-            if (this.outputFormat == OutputFormats.JSONL) {
+            if (this.outputFormat == OutputFormats.PRINT) {
+                if (data.type == "http") {
+                    this.log(`HTTP > ${data.request.method} ${data.request.path}`);
+                    if (data.response) {
+                        let sample = JSON.stringify(data.response.data);
+                        if (sample.length > 80) {
+                            sample = sample.slice(0, 80) + "…";
+                        }
+                        this.log(`HTTP < ${data.response.status_code} ${sample}`);
+                    }
+                } else if (data.type == "ws") {
+                    let sample = JSON.stringify(data.data);
+                    if (sample.length > 80) {
+                        sample = sample.slice(0, 80) + "…";
+                    }
+                    this.log(`WS ${data.direction == 'send' ? ">" : "<"} ${sample}`);
+                }
+            } else if (this.outputFormat == OutputFormats.JSONL) {
                 console.log(JSON.stringify(data));
             } else if (this.outputFormat == OutputFormats.ELASTICSEARCH) {
                 if (data.type == "http"
