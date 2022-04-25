@@ -19,7 +19,7 @@ export async function openServer(page: puppeteer_types.Page, serverId: string) {
         // Wait for a single channel link with this server ID to appear
         // TODO: This may fail on servers without any available channel.
 
-        await page.waitForSelector(`#channels ul li a[href^="/channels/${serverId}"]`);
+        await page.waitForSelector(channelLinkSelector);
     }
 
     // Make sure all categories are expanded  

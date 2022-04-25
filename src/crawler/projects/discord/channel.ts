@@ -4,7 +4,7 @@ import * as puppeteer_types from 'puppeteer';
 import cliProgress from 'cli-progress';
 
 import {CrawlerInterface} from '../../crawl';
-import { retry, scrollToBottom, scrollToTop } from '../../utils';
+import { retry, scrollToBottom, scrollToTop, waitForAndClick } from '../../utils';
 import { openServer } from './server';
 import {datetimeToDiscordSnowflake, DiscordTask} from './utils'
 
@@ -263,5 +263,73 @@ export class ChannelDiscordTask extends DiscordTask {
         await this._scrollChat(crawler, messageCount);
 
         //await crawler.page.waitForTimeout(15_000);
+    }
+}
+
+
+export class DMDiscordTask extends ChannelDiscordTask {
+    type = "DMDiscordTask";
+    channelId: string;
+    after?: Date;
+    before?: Date;
+
+    constructor(
+        channelId: string,
+        after?: Date | string,
+        before?: Date | string,
+    ) {
+        // XXX a minimal "after" date is provided because Discord doesn't
+        // allow searching in DMs without some filter
+        // This is pending a refactor to support downloading chat
+        // without searching (though the message count is still useful)
+        super(null, channelId, after || new Date("2010-01-01"), before);
+    }
+
+    async _openChannel(crawler: CrawlerInterface) {
+        const privateChannelsSelector = `nav[class^="privateChannels"]`;
+        
+        if (await crawler.page.$(privateChannelsSelector)) {
+            // DM list is already open
+        } else {
+            await waitForAndClick(crawler.page, 
+                `[data-list-item-id=guildsnav___home]`,
+                `Home button not found`
+            );
+    
+            await crawler.page.waitForSelector(privateChannelsSelector);
+        }
+
+        const dmLinkSelector = `[data-list-id^="private-channels"] ul li a[href="/channels/@me/${this.channelId}"]`;
+
+        if (!await crawler.page.$(dmLinkSelector)) {
+            // TODO refactor these into a findInScroller function
+            await scrollToTop(crawler.page, `[data-list-id^="private-channels"]`);
+
+            await scrollToBottom(crawler.page, `[data-list-id^="private-channels"]`,
+                async () => {
+                    return !!await crawler.page.$(dmLinkSelector);
+                }
+            );
+        }
+
+        if (!await crawler.page.$(dmLinkSelector)) {
+            throw Error(`DM ID ${this.channelId} not found`);
+        }
+
+        await crawler.page.$eval(dmLinkSelector,
+            el => el.scrollIntoView({behavior: "smooth", block: "center", inline: "nearest"})
+        );
+
+        // Tragically, Discord offers no solid indication a DM with a given ID is actually open
+
+        await retry(async () => {
+            await crawler.page.click(dmLinkSelector, { delay: 50 });
+            await crawler.page.waitForSelector(
+                `[data-list-id^="private-channels"] ul li div[class*="selected"] a[href="/channels/@me/${this.channelId}"]`,
+                { timeout: 200 }
+            );
+        }, 10, "opening channel");
+
+        await crawler.log(`DM ${this.channelId} opened`)
     }
 }

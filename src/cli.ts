@@ -3,7 +3,7 @@ import { Command, Option } from 'commander';
 import { spawn } from 'child_process';
 
 import { Crawler, Task } from './crawler/crawl';
-import { DiscordProject, ProfileDiscordTask, ChannelDiscordTask, ServerDiscordTask } from './crawler/projects/discord';
+import { DiscordProject, DMDiscordTask, ChannelDiscordTask, ServerDiscordTask } from './crawler/projects/discord';
 import { Reader } from './reader/reader';
 import { DummyCaptureTool } from './captureTools';
 import { Mitmdump } from './captureTools/mitmdump';
@@ -68,8 +68,21 @@ addCommonOptions(program.command('profile'))
     })
 
 
+addCommonOptions(program.command('dm'))
+    .description('Download a single DM')
+    .argument('<dm-id>', 'Channel ID')
+    .option('--after <date>', 'Date after which to retrieve history')
+    .option('--before <date>', 'Date before which to retrieve history')
+    .action( async (channelId, opts) => {
+        await crawler(opts, 'dm',
+        [
+            new DMDiscordTask(channelId, opts.after, opts.before)
+        ])
+    });
+
+
 addCommonOptions(program.command('channel'))
-    .description('Scrape a single channel')
+    .description('Download a single channel')
     .argument('<server-id>', 'Server ID')
     .argument('<channel-id>', 'Channel ID')
     .option('--after <date>', 'Date after which to retrieve history')
@@ -82,7 +95,7 @@ addCommonOptions(program.command('channel'))
     });
 
 addCommonOptions(program.command('server'))
-    .description('Scrape a single server')
+    .description('Download a single server')
     .argument('<server-id>', 'Server ID')
     .option('--after <date>', 'Date after which to retrieve history')
     .option('--before <date>', 'Date before which to retrieve history')
