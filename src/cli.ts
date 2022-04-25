@@ -2,10 +2,10 @@ import dotenv from 'dotenv';
 import { Command, Option } from 'commander';
 import { spawn } from 'child_process';
 
-import { Crawler, Task } from './crawl';
-import { DiscordProject, ProfileDiscordTask, ChannelDiscordTask, ServerDiscordTask } from './discord';
+import { Crawler, Task } from './crawler/crawl';
+import { DiscordProject, ProfileDiscordTask, ChannelDiscordTask, ServerDiscordTask } from './crawler/projects/discord';
 import { Reader } from './reader/reader';
-import { DummyCaptureTool } from './captureTools/captureTools';
+import { DummyCaptureTool } from './captureTools';
 import { Mitmdump } from './captureTools/mitmdump';
 import { Tshark } from './captureTools/tshark';
 

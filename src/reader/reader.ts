@@ -2,7 +2,7 @@ import { spawn } from 'child_process';
 import * as fs from 'fs/promises';
 //import zlib from 'zlib';
 
-import { State } from '../crawl';
+import { State } from '../crawler/crawl';
 
 import { ReaderOutput } from './output';
 import { readPcapng } from './tshark/tshark';

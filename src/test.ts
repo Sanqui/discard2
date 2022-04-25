@@ -1,8 +1,8 @@
 import * as fs from 'fs/promises';
 
-import { Crawler, State } from './crawl';
-import { DiscordProject, ProfileDiscordTask, ChannelDiscordTask, ServerDiscordTask } from './discord';
-import { DummyCaptureTool } from './captureTools/captureTools';
+import { Crawler, State } from './crawler/crawl';
+import { DiscordProject, ProfileDiscordTask, ChannelDiscordTask, ServerDiscordTask } from './crawler/projects/discord';
+import { DummyCaptureTool } from './captureTools';
 import { Mitmdump, MitmdumpReplay } from './captureTools/mitmdump';
 import { Tshark } from './captureTools/tshark';
 import { Reader, OutputFormats } from './reader/reader';
@@ -65,7 +65,7 @@ test('runs a profile job against a replay', async () => {
 
 async function checkForMessages(dataPath: string, expected: Set<string>) {
     const seen = new Set<string>();
-    const reader = new Reader(dataPath, false, false, OutputFormats.JSONL,
+    const reader = new Reader(dataPath, false, OutputFormats.JSONL,
         (data: ReaderOutput) => {
             //console.log(data);
             if (data.type == "http"

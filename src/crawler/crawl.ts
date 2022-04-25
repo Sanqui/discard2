@@ -6,7 +6,7 @@ import puppeteer from 'puppeteer-extra'
 import StealthPlugin from 'puppeteer-extra-plugin-stealth'
 import pressAnyKey from 'press-any-key';
 
-import { CaptureTool } from './captureTools/captureTools';
+import { CaptureTool } from '../captureTools';
 
 puppeteer.use(StealthPlugin());
 
@@ -212,6 +212,10 @@ export class Crawler {
             }
         });
         const page = await this.browser.newPage();
+        page.on('error', (err) => {
+            void this.log(`Page error: ${err}`);
+            // TODO proper handling (restart current task or crash)
+        });
 
         if (this.blockImages) {
             await page.setRequestInterception(true);

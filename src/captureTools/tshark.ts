@@ -1,6 +1,6 @@
 import { spawn, ChildProcess } from 'child_process';
 
-import { CaptureTool } from './captureTools';
+import { CaptureTool } from '.';
 
 export class Tshark extends CaptureTool {
     process: ChildProcess;
