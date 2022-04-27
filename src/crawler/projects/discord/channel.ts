@@ -333,3 +333,85 @@ export class DMDiscordTask extends ChannelDiscordTask {
         await crawler.log(`DM ${this.channelId} opened`)
     }
 }
+
+
+export class ThreadDiscordTask extends ChannelDiscordTask {
+    type = "ThreadDiscordTask";
+    serverId: string;
+    channelId: string;
+    threadId: string;
+
+    constructor(
+        serverId: string,
+        channelId: string,
+        threadId: string,
+    ) {
+        super(serverId, channelId, null, null);
+        this.threadId = threadId;
+    }
+
+    // Finds a given thread in a channel if provided,
+    // else finds all threads
+    async findThread(crawler: CrawlerInterface, threadId?: string) {
+        const threads: unknown[] = [];
+        let stopSearching = false;
+
+        const urlMatches = (url: string) =>
+            url.match(`^https://discord.com/api/v9/channels/${this.channelId}/threads/search`)
+        ;
+
+        let threadsResponseHandler: (response: puppeteer_types.HTTPResponse) => Promise<void>;
+
+        // Promise which resolves once all threads have been fetched
+        const allThreadsPromise = new Promise<void>(resolve => {
+            // Response handler for thread information
+            threadsResponseHandler = async (response) => {
+                if (urlMatches(response.url()) && response.status() === 200) {
+                    const json = await response.json();
+                    threads.push(...json.threads);
+                    if (
+                        (threadId && json.threads.find(t => t.id === threadId))
+                        || !json.has_more
+                    ) {
+                        stopSearching = true;
+                        crawler.page.off("response", threadsResponseHandler);
+                        resolve();
+                    }
+                }
+            }
+        });
+
+        crawler.page.on("response", threadsResponseHandler);
+
+        // Open threads dialog
+        await crawler.page.click(`[role="button"][aria-label="Threads"]`);
+        // Wait for dialog to open and first answer to load
+        await Promise.all([
+            crawler.page.waitForSelector(`div[role="dialog"]`),
+            crawler.page.waitForResponse(response =>
+                urlMatches(response.url()) && response.status() === 200
+            )
+        ]);
+        // Scroll list of threads, stopping early if we already found the thread
+        // or if we've reached the end of the list
+        await scrollToBottom(
+            crawler.page, `div[role="dialog"] div[class^="list"]`,
+            async () => stopSearching
+        );
+        // Wait for all thread request responses to come in
+        await Promise.resolve(allThreadsPromise);
+
+        if (threadId) {
+            // TODO click on this thread
+        } else {
+            await crawler.log(`Discovered ${threads.length} threads`);
+            return threads;
+        }
+    }
+
+    async perform(crawler: CrawlerInterface) {
+        await this._openChannel(crawler);
+
+        await this.findThread(crawler, this.threadId);
+    }
+}

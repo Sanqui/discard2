@@ -3,7 +3,7 @@ import { Command, Option } from 'commander';
 import { spawn } from 'child_process';
 
 import { Crawler, Task } from './crawler/crawl';
-import { DiscordProject, DMDiscordTask, ChannelDiscordTask, ServerDiscordTask } from './crawler/projects/discord';
+import { DiscordProject, DMDiscordTask, ChannelDiscordTask, ThreadDiscordTask, ServerDiscordTask } from './crawler/projects/discord';
 import { Reader } from './reader/reader';
 import { DummyCaptureTool } from './captureTools';
 import { Mitmdump } from './captureTools/mitmdump';
@@ -68,7 +68,7 @@ addCommonOptions(program.command('profile'))
     })
 
 
-addCommonOptions(program.command('dm'))
+    addCommonOptions(program.command('dm'))
     .description('Download a single DM')
     .argument('<dm-id>', 'Channel ID')
     .option('--after <date>', 'Date after which to retrieve history')
@@ -91,6 +91,19 @@ addCommonOptions(program.command('channel'))
         await crawler(opts, 'channel',
         [
             new ChannelDiscordTask(serverId, channelId, opts.after, opts.before)
+        ])
+    });
+
+
+addCommonOptions(program.command('thread'))
+    .description('Download a single thread')
+    .argument('<server-id>', 'Server ID')
+    .argument('<channel-id>', 'Channel ID')
+    .argument('<thread-id>', 'Thread ID')
+    .action( async (serverId: string, channelId: string, threadId: string, opts) => {
+        await crawler(opts, 'thread',
+        [
+            new ThreadDiscordTask(serverId, channelId, threadId)
         ])
     });
 
