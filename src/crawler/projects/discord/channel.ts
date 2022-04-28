@@ -367,11 +367,11 @@ export class ThreadDiscordTask extends ChannelDiscordTask {
             // Response handler for thread information
             threadsResponseHandler = async (response) => {
                 if (urlMatches(response.url()) && response.status() === 200) {
-                    const json = await response.json();
-                    threads.push(...json.threads);
+                    const json = await response.json() as unknown;
+                    threads.push(...json['threads']);
                     if (
-                        (threadId && json.threads.find(t => t.id === threadId))
-                        || !json.has_more
+                        (threadId && json['threads'].find(t => t['id'] === threadId))
+                        || !json['has_more']
                     ) {
                         stopSearching = true;
                         crawler.page.off("response", threadsResponseHandler);
@@ -392,6 +392,7 @@ export class ThreadDiscordTask extends ChannelDiscordTask {
                 urlMatches(response.url()) && response.status() === 200
             )
         ]);
+
         // Scroll list of threads, stopping early if we already found the thread
         // or if we've reached the end of the list
         await scrollToBottom(
@@ -402,9 +403,42 @@ export class ThreadDiscordTask extends ChannelDiscordTask {
         await Promise.resolve(allThreadsPromise);
 
         if (threadId) {
-            // TODO click on this thread
+            const thread = threads.find(t => t['id'] === threadId);
+            if (!thread) {
+                throw Error(`Thread ${threadId} not found`);
+            }
+            // XXX this finds the right thread button by its name.
+            // It wll work in the majority of cases but is error prone.
+            // Yet, Discord does not expose the thread ID in its UI.
+            let found = false;
+            await scrollToBottom(
+                crawler.page, `div[role="dialog"] div[class^="list"]`,
+                async () => {
+                    const buttons = await crawler.page.$$('div[role="dialog"] div[class^="list"] div[role="button"]');
+                    for (const button of buttons) {
+                        if (await button.$eval('h3 span', el => el.innerHTML.trim()) === thread['name']) {
+                            await retry(async () => {
+                                await crawler.page.waitForTimeout(100);
+                                await button.click({ delay: 200 });
+                                await crawler.page.waitForSelector(
+                                    `li[class*="selected"] [data-list-item-id="channels___${this.threadId}"]`,
+                                    { timeout: 500 }
+                                );
+                            }, 5, "clicking thread button");
+                            found = true;
+                            return true;
+                        }
+                    }
+                }
+            );
+            if (!found) {
+                throw Error(`Button for ${threadId} not found, but we know it's there...`);
+            }
+            await crawler.log(`Opened thread ${threadId}`);
         } else {
             await crawler.log(`Discovered ${threads.length} threads`);
+            await crawler.page.keyboard.press('Escape');
+            await crawler.page.waitForTimeout(200);
             return threads;
         }
     }
