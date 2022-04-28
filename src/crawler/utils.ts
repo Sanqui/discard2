@@ -99,7 +99,7 @@ export async function scrollToBottom(
         await page.$eval(selector, el => el.scrollTop + el.clientHeight + 1 < el.scrollHeight)
     ) {
         await page.$eval(selector,
-            el => el.scrollBy({top: 150, behavior: 'smooth'})
+            el => el.scrollBy({top: 300, behavior: 'smooth'})
         );
 
         if (func && await func()) {

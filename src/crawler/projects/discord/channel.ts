@@ -226,7 +226,7 @@ export class ChannelDiscordTask extends DiscordTask {
                 }
             }
 
-            if (!await crawler.page.$(`div[class^="jumpToPresentBar"`)) {
+            if (!await crawler.page.$(`div[class^="jumpToPresentBar"]`)) {
                 bar1.stop();
                 await crawler.log(`We have reached the last message ("Jump to Present" bar is not present)`);
                 break;
@@ -443,9 +443,36 @@ export class ThreadDiscordTask extends ChannelDiscordTask {
         }
     }
 
+    async _scrollChat(crawler: CrawlerInterface): Promise<void> {
+        await crawler.log(`Crawling thread ${this.threadId} (unable to show progress)...`);
+        if (await crawler.page.$(`div[class^="jumpToPresentBar"]`)) {
+            // We see the "Jump to Present" button.
+            // Smash it, because we only know how to scroll up in a thread.
+            await retry(async () => {
+                await crawler.page.click(`div[class^="jumpToPresentBar"]`, { delay: 200 });
+                await crawler.page.waitForSelector(
+                    `div[class^="jumpToPresentBar"]`,
+                    { hidden: true, timeout: 500 }
+                );
+            }, 5, "clicking Jump to Present");
+        }
+
+        // Scroll up until we reach the chat header, signifying the beginning
+        // of the thread
+        while (!await crawler.page.$(`#chat-messages-${this.threadId}`)) {
+            await crawler.page.$eval(`div[class^="chat"] div[class^="scroller"]`,
+                el => el.scrollBy(0, -800)
+            );
+            await crawler.page.waitForTimeout(300);
+        }
+        await crawler.log(`Finished thread ${this.threadId}`);
+    }
+
     async perform(crawler: CrawlerInterface) {
         await this._openChannel(crawler);
 
         await this.findThread(crawler, this.threadId);
+
+        await this._scrollChat(crawler);
     }
 }
