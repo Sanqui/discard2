@@ -2,7 +2,7 @@ import * as puppeteer_types from 'puppeteer';
 
 import {CrawlerInterface} from '../../crawl';
 import { waitForAndClick, scrollToBottom, scrollToTop } from '../../utils';
-import { ChannelDiscordTask } from './channel';
+import { ChannelDiscordTask, ChannelThreadsDiscordTask } from './channel';
 import {DiscordTask} from './utils'
 
 export async function openServer(page: puppeteer_types.Page, serverId: string) {
@@ -41,11 +41,13 @@ export class ServerDiscordTask extends DiscordTask {
         public serverId: string,
         after?: Date | string,
         before?: Date | string,
+        public threadsOnly?: boolean,
     ) {
         super();
 
         this.after = typeof after == "string" ? new Date(after) : after;
         this.before = typeof before == "string" ? new Date(before) : before;
+        this.threadsOnly = threadsOnly;
     }
 
     async perform(crawler: CrawlerInterface) {
@@ -72,8 +74,14 @@ export class ServerDiscordTask extends DiscordTask {
 
         await crawler.log(`Discovered ${channelIds.length} channels, creating tasks`);
         
-        return channelIds.map(
-            el => new ChannelDiscordTask(this.serverId, el, this.after, this.before)
-        );
+        if (!this.threadsOnly) {
+            return channelIds.map(
+                el => new ChannelDiscordTask(this.serverId, el, this.after, this.before)
+            );
+        } else {
+            return channelIds.map(
+                el => new ChannelThreadsDiscordTask(this.serverId, el)
+            );
+        }
     }
 }

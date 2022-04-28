@@ -112,10 +112,11 @@ addCommonOptions(program.command('server'))
     .argument('<server-id>', 'Server ID')
     .option('--after <date>', 'Date after which to retrieve history')
     .option('--before <date>', 'Date before which to retrieve history')
+    .option('--threads-only', 'Retrieve only thread history, not channel history')
     .action( async (serverId, opts) => {
         await crawler(opts, 'server',
         [
-            new ServerDiscordTask(serverId, opts.after, opts.before)
+            new ServerDiscordTask(serverId, opts.after, opts.before, opts.threadsOnly)
         ])
     });
 

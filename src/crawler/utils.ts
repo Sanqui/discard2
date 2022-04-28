@@ -90,12 +90,15 @@ export async function scrollToTop(page: puppeteer.Page, selector: string) {
 
 export async function scrollToBottom(
     page: puppeteer.Page, selector: string,
-    func?: () => Promise<boolean | void>
+    func?: () => Promise<boolean | void>,
+    mustWaitForFunc?: boolean,
+    speed?: number
 ) {
     if (func && await func()) {
         return;
     }
     while (
+        (mustWaitForFunc && !(await func())) ||
         await page.$eval(selector, el => el.scrollTop + el.clientHeight + 1 < el.scrollHeight)
     ) {
         await page.$eval(selector,
@@ -106,6 +109,6 @@ export async function scrollToBottom(
             return;
         }
 
-        await page.waitForTimeout(100);
+        await page.waitForTimeout(150);
     }
 }

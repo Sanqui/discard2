@@ -1,10 +1,10 @@
 import { Project, Task } from '../../crawl';
 import { LoginDiscordTask } from './login';
-import { ChannelDiscordTask, DMDiscordTask, ThreadDiscordTask } from './channel';
+import { ChannelDiscordTask, DMDiscordTask, ThreadDiscordTask, ChannelThreadsDiscordTask } from './channel';
 import { ServerDiscordTask } from './server';
 import { ProfileDiscordTask } from './profile';
 
-export { LoginDiscordTask, DMDiscordTask, ChannelDiscordTask, ThreadDiscordTask, ServerDiscordTask, ProfileDiscordTask };
+export { LoginDiscordTask, DMDiscordTask, ChannelDiscordTask, ThreadDiscordTask, ChannelThreadsDiscordTask, ServerDiscordTask, ProfileDiscordTask };
 
 //const discord_url = new URL("https://discord.com/");
 //
@@ -20,6 +20,8 @@ export class DiscordProject implements Project {
         LoginDiscordTask: LoginDiscordTask,
         ChannelDiscordTask: ChannelDiscordTask,
         DMDiscordTask: DMDiscordTask,
+        ThreadDiscordTask: ThreadDiscordTask,
+        ChannelThreadsDiscordTask: ChannelThreadsDiscordTask,
         ServerDiscordTask: ServerDiscordTask,
     };
     initialTasks: Task[];

@@ -162,6 +162,9 @@ export class Crawler {
             const resumeState = JSON.parse(await fs.readFile(`${this.resume}/state.json`, 'utf8')) as State;
 
             for (const taskObj of [resumeState.tasks.current, ...resumeState.tasks.queued]) {
+                if (!(taskObj.type in this.project.taskClasses)) {
+                    throw Error(`Task type ${taskObj.type} not found in project`);
+                }
                 const task = new this.project.taskClasses[taskObj.type];
                 for (const key in taskObj) {
                     if (key !== 'type') {

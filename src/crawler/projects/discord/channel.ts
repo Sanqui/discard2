@@ -3,10 +3,50 @@ import dateFormat from "dateformat";
 import * as puppeteer_types from 'puppeteer';
 import cliProgress from 'cli-progress';
 
-import {CrawlerInterface} from '../../crawl';
+import { CrawlerInterface } from '../../crawl';
 import { retry, scrollToBottom, scrollToTop, waitForAndClick } from '../../utils';
 import { openServer } from './server';
 import {datetimeToDiscordSnowflake, DiscordTask} from './utils'
+
+async function openChannel(crawler: CrawlerInterface, serverId: string, channelId: string) {
+    await openServer(crawler.page, serverId);
+
+    const channelLinkSelector = `#channels ul li [data-list-item-id=channels___${channelId}]`;
+
+    if (!await crawler.page.$(channelLinkSelector)) {
+        await scrollToTop(crawler.page, `#channels`);
+
+        await scrollToBottom(crawler.page, `#channels`,
+            async () => {
+                return !!await crawler.page.$(channelLinkSelector);
+            }
+        );
+    }
+
+    if (!await crawler.page.$(channelLinkSelector)) {
+        throw Error(`Channel ID ${channelId} not found`);
+    }
+
+    // We need to scroll because of the "New unreads" indicator
+
+    await crawler.page.$eval(channelLinkSelector,
+        el => el.scrollIntoView({behavior: "smooth", block: "center", inline: "nearest"})
+    );
+
+    await retry(async () => {
+        await crawler.page.click(channelLinkSelector, { delay: 50 });
+        await crawler.page.waitForSelector(`[data-list-id="members-${channelId}"]`, { timeout: 200 });
+    }, 10, "opening channel");
+
+    if (await crawler.page.$(`div[class^="chat"] div[class*="gatedContent"]`)) {
+        await crawler.log('Hit "Age-Restricted Channel" message, continuing...');
+        await crawler.page.click(`div[class^="chat"] div[class*="gatedContent"] button:nth-of-type(2)`);
+        await crawler.page.waitForTimeout(100);
+
+    }
+
+    await crawler.log(`Channel ${channelId} opened`)
+}
 
 export class ChannelDiscordTask extends DiscordTask {
     type = "ChannelDiscordTask";
@@ -27,46 +67,6 @@ export class ChannelDiscordTask extends DiscordTask {
 
         this.after = typeof after == "string" ? new Date(after) : after;
         this.before = typeof before == "string" ? new Date(before) : before;
-    }
-
-    async _openChannel(crawler: CrawlerInterface) {
-        await openServer(crawler.page, this.serverId);
-
-        const channelLinkSelector = `#channels ul li [data-list-item-id=channels___${this.channelId}]`;
-
-        if (!await crawler.page.$(channelLinkSelector)) {
-            await scrollToTop(crawler.page, `#channels`);
-
-            await scrollToBottom(crawler.page, `#channels`,
-                async () => {
-                    return !!await crawler.page.$(channelLinkSelector);
-                }
-            );
-        }
-
-        if (!await crawler.page.$(channelLinkSelector)) {
-            throw Error(`Channel ID ${this.channelId} not found`);
-        }
-
-        // We need to scroll because of the "New unreads" indicator
-
-        await crawler.page.$eval(channelLinkSelector,
-            el => el.scrollIntoView({behavior: "smooth", block: "center", inline: "nearest"})
-        );
-
-        await retry(async () => {
-            await crawler.page.click(channelLinkSelector, { delay: 50 });
-            await crawler.page.waitForSelector(`[data-list-id="members-${this.channelId}"]`, { timeout: 200 });
-        }, 10, "opening channel");
-
-        if (await crawler.page.$(`div[class^="chat"] div[class*="gatedContent"]`)) {
-            await crawler.log('Hit "Age-Restricted Channel" message, continuing...');
-            await crawler.page.click(`div[class^="chat"] div[class*="gatedContent"] button:nth-of-type(2)`);
-            await crawler.page.waitForTimeout(100);
-
-        }
-
-        await crawler.log(`Channel ${this.channelId} opened`)
     }
 
     async _pressCtrlF(page: puppeteer_types.Page) {
@@ -252,7 +252,7 @@ export class ChannelDiscordTask extends DiscordTask {
     }
 
     async perform(crawler: CrawlerInterface) {
-        await this._openChannel(crawler);
+        await openChannel(crawler, this.serverId, this.channelId);
 
         const result = await this._searchAndClickFirstResult(crawler);
 
@@ -334,6 +334,130 @@ export class DMDiscordTask extends ChannelDiscordTask {
     }
 }
 
+// XXX this should really be on the Project, regardless,
+// since Discord doesn't re-request the thread list when
+// we open it, we have to keep it locally
+const threadCache: unknown[] = [];
+const readThreadsFromChannel: Map<string, boolean> = new Map();
+
+// Finds a given thread in a channel if provided,
+// else finds all threads
+async function findThread(crawler: CrawlerInterface, channelId: string, threadId?: string) {
+    await crawler.log(`Finding thread ${threadId} in channel ${channelId}...`);
+    const threads: unknown[] = [];
+    let stopSearching = false;
+
+    const urlMatches = (url: string) =>
+        url.match(`^https://discord.com/api/v9/channels/${channelId}/threads/search`)
+    ;
+
+    let threadsResponseHandler: (response: puppeteer_types.HTTPResponse) => Promise<void>;
+
+    // Promise which resolves once all threads have been fetched
+    const allThreadsPromise = new Promise<void>(resolve => {
+        // Response handler for thread information
+        threadsResponseHandler = async (response) => {
+            if (urlMatches(response.url()) && response.status() === 200) {
+                const json = await response.json() as unknown;
+                console.log(`Received response with thread data (has more: ${json['has_more']})`);
+                threads.push(...json['threads']);
+                threadCache.push(...json['threads']);
+                if (
+                    (threadId && json['threads'].find(t => t['id'] === threadId))
+                    || !json['has_more']
+                ) {
+                    stopSearching = true;
+                    crawler.page.off("response", threadsResponseHandler);
+                    resolve();
+                }
+            }
+        }
+    });
+
+    crawler.page.on("response", threadsResponseHandler);
+
+    // Open threads dialog
+    await crawler.page.click(`[role="button"][aria-label="Threads"]`);
+    // If we're looking for a thread, and it's already in our cache,
+    // don't require things to load
+    if (!(threadId && threadCache.find(t => t['id'] === threadId))) {
+        // Wait for dialog to open and first answer to load
+        await crawler.log(`Waiting for threads dialog to open and first answer to load`);
+        try {
+            await Promise.all([
+                crawler.page.waitForSelector(`div[role="dialog"]`),
+                crawler.page.waitForResponse(response =>
+                    urlMatches(response.url()) && response.status() === 200
+                )
+            ]);
+        } catch (e) {
+            await crawler.log(`Warning: Received no threads response, assuming no threads`);
+        }
+
+        // Scroll list of threads, stopping early if we already found the thread
+        // or if we've reached the end of the list
+        await crawler.log(`Scrolling list of threads`);
+        await scrollToBottom(
+            crawler.page, `div[role="dialog"] div[class^="list"]`,
+            async () => stopSearching,
+            true
+        );
+        // Wait for all thread request responses to come in
+        await crawler.log(`Waiting for all thread request responses to come in`);
+        await Promise.resolve(allThreadsPromise);
+    } else {
+        await crawler.page.waitForSelector(`div[role="dialog"]`);
+        crawler.page.off("response", threadsResponseHandler);
+    }
+
+    if (threadId) {
+        let thread = threads.find(t => t['id'] === threadId);
+        if (!thread) {
+            thread = threadCache.find(t => t['id'] === threadId);
+            if (!thread) {
+                throw Error(`Thread ${threadId} not found`);
+            }
+        }
+        // XXX this finds the right thread button by its name.
+        // It wll work in the majority of cases but is error prone.
+        // Yet, Discord does not expose the thread ID in its UI.
+        let found = false;
+        await crawler.page.$eval(`div[role="dialog"] div[class^="list"]`,
+            el => el.scrollBy(0, -600)
+        );
+        await scrollToBottom(
+            crawler.page, `div[role="dialog"] div[class^="list"]`,
+            async () => {
+                const buttons = await crawler.page.$$('div[role="dialog"] div[class^="list"] div[role="button"]');
+                for (const button of buttons) {
+                    if (await button.$eval('h3 span', el => el.innerHTML.trim()) === thread['name']) {
+                        await retry(async () => {
+                            await crawler.page.waitForTimeout(100);
+                            await button.click({ delay: 200 });
+                            await crawler.page.waitForSelector(
+                                `li[class*="selected"] [data-list-item-id="channels___${threadId}"]`,
+                                { timeout: 200 }
+                            );
+                        }, 5, "clicking thread button");
+                        found = true;
+                        return true;
+                    }
+                }
+            }, false, 100
+        );
+        if (!found) {
+            throw Error(`Button for ${threadId} not found, but we know it's there...`);
+        }
+        await crawler.log(`Opened thread ${threadId}`);
+    } else {
+        await crawler.log(`Discovered ${threads.length} threads`);
+        readThreadsFromChannel[channelId] = true;
+        await crawler.page.keyboard.press('Escape');
+        await crawler.page.waitForTimeout(1000);
+        return threads;
+    }
+}
+
 
 export class ThreadDiscordTask extends ChannelDiscordTask {
     type = "ThreadDiscordTask";
@@ -350,106 +474,21 @@ export class ThreadDiscordTask extends ChannelDiscordTask {
         this.threadId = threadId;
     }
 
-    // Finds a given thread in a channel if provided,
-    // else finds all threads
-    async findThread(crawler: CrawlerInterface, threadId?: string) {
-        const threads: unknown[] = [];
-        let stopSearching = false;
-
-        const urlMatches = (url: string) =>
-            url.match(`^https://discord.com/api/v9/channels/${this.channelId}/threads/search`)
-        ;
-
-        let threadsResponseHandler: (response: puppeteer_types.HTTPResponse) => Promise<void>;
-
-        // Promise which resolves once all threads have been fetched
-        const allThreadsPromise = new Promise<void>(resolve => {
-            // Response handler for thread information
-            threadsResponseHandler = async (response) => {
-                if (urlMatches(response.url()) && response.status() === 200) {
-                    const json = await response.json() as unknown;
-                    threads.push(...json['threads']);
-                    if (
-                        (threadId && json['threads'].find(t => t['id'] === threadId))
-                        || !json['has_more']
-                    ) {
-                        stopSearching = true;
-                        crawler.page.off("response", threadsResponseHandler);
-                        resolve();
-                    }
-                }
-            }
-        });
-
-        crawler.page.on("response", threadsResponseHandler);
-
-        // Open threads dialog
-        await crawler.page.click(`[role="button"][aria-label="Threads"]`);
-        // Wait for dialog to open and first answer to load
-        await Promise.all([
-            crawler.page.waitForSelector(`div[role="dialog"]`),
-            crawler.page.waitForResponse(response =>
-                urlMatches(response.url()) && response.status() === 200
-            )
-        ]);
-
-        // Scroll list of threads, stopping early if we already found the thread
-        // or if we've reached the end of the list
-        await scrollToBottom(
-            crawler.page, `div[role="dialog"] div[class^="list"]`,
-            async () => stopSearching
-        );
-        // Wait for all thread request responses to come in
-        await Promise.resolve(allThreadsPromise);
-
-        if (threadId) {
-            const thread = threads.find(t => t['id'] === threadId);
-            if (!thread) {
-                throw Error(`Thread ${threadId} not found`);
-            }
-            // XXX this finds the right thread button by its name.
-            // It wll work in the majority of cases but is error prone.
-            // Yet, Discord does not expose the thread ID in its UI.
-            let found = false;
-            await scrollToBottom(
-                crawler.page, `div[role="dialog"] div[class^="list"]`,
-                async () => {
-                    const buttons = await crawler.page.$$('div[role="dialog"] div[class^="list"] div[role="button"]');
-                    for (const button of buttons) {
-                        if (await button.$eval('h3 span', el => el.innerHTML.trim()) === thread['name']) {
-                            await retry(async () => {
-                                await crawler.page.waitForTimeout(100);
-                                await button.click({ delay: 200 });
-                                await crawler.page.waitForSelector(
-                                    `li[class*="selected"] [data-list-item-id="channels___${this.threadId}"]`,
-                                    { timeout: 500 }
-                                );
-                            }, 5, "clicking thread button");
-                            found = true;
-                            return true;
-                        }
-                    }
-                }
-            );
-            if (!found) {
-                throw Error(`Button for ${threadId} not found, but we know it's there...`);
-            }
-            await crawler.log(`Opened thread ${threadId}`);
-        } else {
-            await crawler.log(`Discovered ${threads.length} threads`);
-            await crawler.page.keyboard.press('Escape');
-            await crawler.page.waitForTimeout(200);
-            return threads;
-        }
-    }
-
     async _scrollChat(crawler: CrawlerInterface): Promise<void> {
         await crawler.log(`Crawling thread ${this.threadId} (unable to show progress)...`);
+        await crawler.page.$eval(`div[class^="chat"] div[class^="scroller"]`,
+            el => el.scrollBy(0, 300)
+        );
+        await crawler.page.waitForTimeout(300);
         if (await crawler.page.$(`div[class^="jumpToPresentBar"]`)) {
+            await crawler.log(`Clicking Jump to Present...`);
             // We see the "Jump to Present" button.
             // Smash it, because we only know how to scroll up in a thread.
             await retry(async () => {
-                await crawler.page.click(`div[class^="jumpToPresentBar"]`, { delay: 200 });
+                // It can literally disappear in the meantime
+                if (await crawler.page.$(`div[class^="jumpToPresentBar"]`)) {
+                    await crawler.page.click(`div[class^="jumpToPresentBar"]`, { delay: 200 });
+                }
                 await crawler.page.waitForSelector(
                     `div[class^="jumpToPresentBar"]`,
                     { hidden: true, timeout: 500 }
@@ -469,10 +508,49 @@ export class ThreadDiscordTask extends ChannelDiscordTask {
     }
 
     async perform(crawler: CrawlerInterface) {
-        await this._openChannel(crawler);
+        await openChannel(crawler, this.serverId, this.channelId);
 
-        await this.findThread(crawler, this.threadId);
+        if (!readThreadsFromChannel[this.channelId]) {
+            // build thread cache
+            await crawler.log("Building thread cache for channel " + this.channelId);
+            await findThread(crawler, this.channelId);
+        }
+
+        try {
+            await findThread(crawler, this.channelId, this.threadId);
+        } catch (e) {
+            // This currently only happens when multiple threads
+            // have the same name.  It should be made fatal though, or at least
+            // put the task into failed tasks.
+            await crawler.log(`Warning: Failed to find thread due to ${e}, skipping...`);
+            await crawler.page.keyboard.press('Escape');
+            await crawler.page.waitForTimeout(1000);
+            return;
+        }
 
         await this._scrollChat(crawler);
+    }
+}
+
+
+export class ChannelThreadsDiscordTask extends DiscordTask {
+    type = "ChannelThreadsDiscordTask";
+
+    constructor(
+        public serverId: string,
+        public channelId: string,
+    ) {
+        super();
+    }
+
+
+    async perform(crawler: CrawlerInterface) {
+        await openChannel(crawler, this.serverId, this.channelId);
+
+        const threads = await findThread(crawler, this.channelId);
+
+        return threads.map(
+            thread => new ThreadDiscordTask(this.serverId, this.channelId, thread['id'])
+        );
     }
 }
