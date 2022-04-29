@@ -1,8 +1,9 @@
 import { spawn } from 'child_process';
 
+import ZlibSync = require("zlib-sync");
 import JsonlParser from 'stream-json/jsonl/Parser';
 
-import { ReaderOutput } from './output';
+import { ReaderOutput, ReaderOutputWsCompressed } from './output';
 
 export async function readMitmproxy(
     path: string,
@@ -22,7 +23,26 @@ export async function readMitmproxy(
         }
     });
 
-    for await (const obj of process.stdout.pipe(new JsonlParser())) {
-        output(obj.value as ReaderOutput);
+    const discordWsStreamInflator = new ZlibSync.Inflate();
+
+    let obj: ReaderOutput | ReaderOutputWsCompressed;
+    for await ({value: obj} of process.stdout.pipe(new JsonlParser())) {
+        if (obj.type == "http" || obj.type == "ws") {
+            output(obj);
+        } else if (obj.type == "ws_compressed") {
+            discordWsStreamInflator.push(Buffer.from(obj.compressed_data, 'hex'), ZlibSync.Z_SYNC_FLUSH);
+
+            if (discordWsStreamInflator.err) {
+                throw Error(`WS stream inflate failed: ${discordWsStreamInflator.msg}`);
+            }
+
+            const data = JSON.parse(discordWsStreamInflator.result?.toString()) as unknown;
+            output({
+                type: "ws",
+                timestamp: obj.timestamp,
+                direction: obj.direction,
+                data
+            });
+        }
     }
 }

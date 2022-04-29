@@ -3,16 +3,32 @@
 Read a mitmproxy dump file.
 Used by src/reader/mitmproxy.ts
 """
-from mitmproxy import io, http
-from mitmproxy.exceptions import FlowReadException
 import json
 import sys
+
+from mitmproxy import io, http
+from mitmproxy.exceptions import FlowReadException
 
 with open(sys.argv[1], "rb") as logfile:
     freader = io.FlowReader(logfile)
     try:
         for f in freader.stream():
             if isinstance(f, http.HTTPFlow):
+                if f.request.host == 'gateway.discord.gg' and f.websocket:
+                    for message in f.websocket.messages:
+                        obj = {
+                            'type': 'ws',
+                            'timestamp': message.timestamp,
+                            'direction': 'send' if message.from_client else 'recv'
+                        }
+                        if message.from_client:
+                            obj['data'] = json.loads(message.text)
+                        else:
+                            obj['type'] = 'ws_compressed'
+                            obj['compressed_data'] = message.content.hex()
+                        
+                        print(json.dumps(obj))
+                
                 if not f.response:
                     continue
                 
@@ -43,7 +59,6 @@ with open(sys.argv[1], "rb") as logfile:
                     },
                 }
                 print(json.dumps(obj))
-            
-            # TODO handle websocket
+
     except FlowReadException as e:
         print(f"Flow file corrupted: {e}")

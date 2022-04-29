@@ -12,7 +12,14 @@ export interface ReaderOutputHttp {
     }
 }
 
-export interface ReaderOutputWs {
+export interface ReaderOutputWsCompressed {
+    type: "ws_compressed",
+    timestamp: string,
+    direction: "send" | "recv",
+    compressed_data: string
+}
+
+interface ReaderOutputWs {
     type: "ws",
     timestamp: string,
     direction: "send" | "recv",
