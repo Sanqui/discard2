@@ -376,23 +376,23 @@ async function findThread(crawler: CrawlerInterface, channelId: string, threadId
 
     crawler.page.on("response", threadsResponseHandler);
 
-    // Open threads dialog
-    await crawler.page.click(`[role="button"][aria-label="Threads"]`);
     // If we're looking for a thread, and it's already in our cache,
     // don't require things to load
     if (!(threadId && threadCache.find(t => t['id'] === threadId))) {
         // Wait for dialog to open and first answer to load
-        await crawler.log(`Waiting for threads dialog to open and first answer to load`);
-        try {
+        //await crawler.log(`Waiting for threads dialog to open and first answer to load`);
+        await retry(async () => {
+            await crawler.page.keyboard.press('Escape'),
+            await crawler.page.waitForTimeout(200),
+            await crawler.page.click(`[role="button"][aria-label="Threads"]`);
             await Promise.all([
                 crawler.page.waitForSelector(`div[role="dialog"]`),
-                crawler.page.waitForResponse(response =>
-                    urlMatches(response.url()) && response.status() === 200
+                crawler.page.waitForResponse(
+                    response => urlMatches(response.url()) && response.status() === 200,
+                    { timeout: 10_000 }
                 )
             ]);
-        } catch (e) {
-            await crawler.log(`Warning: Received no threads response, assuming no threads`);
-        }
+        }, 5, "opening threads dialog");
 
         // Scroll list of threads, stopping early if we already found the thread
         // or if we've reached the end of the list
@@ -406,6 +406,8 @@ async function findThread(crawler: CrawlerInterface, channelId: string, threadId
         await crawler.log(`Waiting for all thread request responses to come in`);
         await Promise.resolve(allThreadsPromise);
     } else {
+        // Open threads dialog
+        await crawler.page.click(`[role="button"][aria-label="Threads"]`);
         await crawler.page.waitForSelector(`div[role="dialog"]`);
         crawler.page.off("response", threadsResponseHandler);
     }
