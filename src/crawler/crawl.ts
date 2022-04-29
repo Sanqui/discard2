@@ -217,6 +217,7 @@ export class Crawler {
         const page = await this.browser.newPage();
         page.on('error', (err) => {
             void this.log(`Page error: ${err}`);
+            throw new Error(`Page error: ${err}`);
             // TODO proper handling (restart current task or crash)
         });
 

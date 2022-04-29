@@ -138,7 +138,7 @@ program.command('reader')
     )
     .option('--debug', 'Output debug information')
     .action( async (jobPath, opts) => {
-        const reader = new Reader(jobPath, opts.verbose, opts.debug, opts.format);
+        const reader = new Reader(jobPath, opts.debug, opts.format);
         await reader.read();
     })
 
