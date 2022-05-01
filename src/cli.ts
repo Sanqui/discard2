@@ -134,7 +134,7 @@ program.command('reader')
     .argument('<job-path>', 'Path to job directory')
     .addOption(
         new Option('-f, --format <format>', 'Output format')
-            .choices(['print', 'jsonl', 'elasticsearch'])
+            .choices(['print', 'jsonl', 'elasticsearch', 'derive-urls'])
     )
     .option('--debug', 'Output debug information')
     .action( async (jobPath, opts) => {

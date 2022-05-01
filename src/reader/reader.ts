@@ -1,6 +1,7 @@
 import { spawn } from 'child_process';
 import * as fs from 'fs/promises';
 //import zlib from 'zlib';
+//import { Message } from 'discord.js';
 
 import { State } from '../crawler/crawl';
 
@@ -13,6 +14,17 @@ export enum OutputFormats {
     JSONL = 'jsonl',
     ELASTICSEARCH = 'elasticsearch',
     DERIVE_URLS = 'derive-urls'
+}
+
+function messagesFromData(data: ReaderOutput): any[] {
+    if (data.type == "http"
+        && data.request.method == "GET"
+        && data.request.path.match(/^\/api\/v9\/channels\/\d+\/messages/)
+        && data.response.status_code == 200
+    ) {
+        return data.response.data as any[];
+    }
+    return [];
 }
 
 export class Reader {
@@ -61,12 +73,8 @@ export class Reader {
             } else if (this.outputFormat == OutputFormats.JSONL) {
                 console.log(JSON.stringify(data));
             } else if (this.outputFormat == OutputFormats.ELASTICSEARCH) {
-                if (data.type == "http"
-                    && data.request.method == "GET"
-                    && data.request.path.match(/^\/api\/v9\/channels\/\d+\/messages/)
-                    && data.response.status_code == 200
-                ) {
-                    for (const message of data.response.data as any[]) {
+                if (data.type == "http") {
+                    for (const message of messagesFromData(data)) {
                         //const id = `${this.state.job.name}-${message['id']}`;
                         const id = `${message['id']}`;
                         console.log(JSON.stringify({
@@ -76,12 +84,23 @@ export class Reader {
                             }
                         }));
                         console.log(JSON.stringify({
-                               job_name: this.state.job.name,
-                               datetime: data.timestamp_end,
-                               data: message
+                                job_name: this.state.job.name,
+                                datetime: data.timestamp_end,
+                                data: message
                         }));
                     }
                 }
+            } else if (this.outputFormat == OutputFormats.DERIVE_URLS) {
+                // Things which generate URLs: attachments, emoji, stickers, user avatars,
+                // server banners, server icons, role icons, user profile banners
+                for (const message of messagesFromData(data)) {
+                    for (const attachment of message.attachments) {
+                        if (attachment.url) {
+                            console.log(attachment.url);
+                        }
+                    }
+                }
+
             }
         }
     }
