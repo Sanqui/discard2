@@ -3,7 +3,8 @@ import { Command, Option } from 'commander';
 import { spawn } from 'child_process';
 
 import { Crawler, Task } from './crawler/crawl';
-import { DiscordProject, DMDiscordTask, ChannelDiscordTask, ThreadDiscordTask, ServerDiscordTask } from './crawler/projects/discord';
+import { DiscordProject, DMDiscordTask, ChannelDiscordTask,
+    ThreadDiscordTask, ServerDiscordTask, ServersDiscordTask } from './crawler/projects/discord';
 import { Reader } from './reader/reader';
 import { DummyCaptureTool } from './captureTools';
 import { Mitmdump } from './captureTools/mitmdump';
@@ -24,28 +25,39 @@ program
     .description('Discord archival tool')
 ;
 
-function addCommonOptions(command: Command) {
-    return command
-        .addOption(
-            new Option('-e, --email <email>', 'Discord account email').env('DISCORD_EMAIL').makeOptionMandatory()
-        )
-        .addOption(
-            new Option('-p, --password <password>', 'Discord account password').env('DISCORD_PASSWORD').makeOptionMandatory()
-        )
-        .addOption(
-            new Option('-b, --browser-data-dir <path>', 'Browser data directory').env('BROWSER_DATA_DIR')
-        )
-        .addOption(
-            new Option('-c, --capture-tool <tool>', 'Capture tool')
-                .choices(['none', 'mitmdump', 'tshark'])
-                .env('CAPTURE_TOOL').makeOptionMandatory()
-        )
-        .option('--headless', 'Run in headless mode')
-        .option('--block-images', 'Do not load images to conserve bandwidth')
-    ;
+class CrawlerCommand extends Command {
+    createCommand(name: string) {
+        const cmd = new Command(name);
+        cmd
+            .addOption(
+                new Option('-e, --email <email>', 'Discord account email').env('DISCORD_EMAIL').makeOptionMandatory()
+            )
+            .addOption(
+                new Option('-p, --password <password>', 'Discord account password').env('DISCORD_PASSWORD').makeOptionMandatory()
+            )
+            .addOption(
+                new Option('-b, --browser-data-dir <path>', 'Browser data directory').env('BROWSER_DATA_DIR')
+            )
+            .addOption(
+                new Option('-c, --capture-tool <tool>', 'Capture tool')
+                    .choices(['none', 'mitmdump', 'tshark'])
+                    .env('CAPTURE_TOOL').makeOptionMandatory()
+            )
+            .option('--headless', 'Run in headless mode')
+            .option('--block-images', 'Do not load images to conserve bandwidth');
+        
+        return cmd;
+    }
 }
 
+const programCrawler = new CrawlerCommand('crawler')
+    .name('crawler')
+    .description('Start or resume a crawling job');
+
+program.addCommand(programCrawler);
+
 async function crawler(opts, mode: string, tasks: Task[], resume?: string) {
+    console.log(opts, opts.email, opts.captureTool)
     const crawler = new Crawler({
         project: new DiscordProject(opts.email, opts.password),
         tasks: tasks,
@@ -60,15 +72,14 @@ async function crawler(opts, mode: string, tasks: Task[], resume?: string) {
     await crawler.run();
 }
 
-
-addCommonOptions(program.command('profile'))
+programCrawler.command('profile')
     .description('Log in and fetch profile information')
     .action( async (opts) => {
         await crawler(opts, 'profile', [])
     })
 
 
-    addCommonOptions(program.command('dm'))
+programCrawler.command('dm')
     .description('Download a single DM')
     .argument('<dm-id>', 'Channel ID')
     .option('--after <date>', 'Date after which to retrieve history')
@@ -80,8 +91,31 @@ addCommonOptions(program.command('profile'))
         ])
     });
 
+programCrawler.command('servers')
+    .description('Download all servers')
+    .option('--after <date>', 'Date after which to retrieve history')
+    .option('--before <date>', 'Date before which to retrieve history')
+    .action( async (opts) => {
+        await crawler(opts, 'servers',
+        [
+            new ServersDiscordTask(opts.after, opts.before)
+        ])
+    });
 
-addCommonOptions(program.command('channel'))
+programCrawler.command('server')
+    .description('Download a single server')
+    .argument('<server-id>', 'Server ID')
+    .option('--after <date>', 'Date after which to retrieve history')
+    .option('--before <date>', 'Date before which to retrieve history')
+    .option('--threads-only', 'Retrieve only thread history, not channel history')
+    .action( async (serverId, opts) => {
+        await crawler(opts, 'server',
+        [
+            new ServerDiscordTask(serverId, opts.after, opts.before, opts.threadsOnly)
+        ])
+    });
+
+programCrawler.command('channel')
     .description('Download a single channel')
     .argument('<server-id>', 'Server ID')
     .argument('<channel-id>', 'Channel ID')
@@ -95,7 +129,7 @@ addCommonOptions(program.command('channel'))
     });
 
 
-addCommonOptions(program.command('thread'))
+programCrawler.command('thread')
     .description('Download a single thread')
     .argument('<server-id>', 'Server ID')
     .argument('<channel-id>', 'Channel ID')
@@ -107,21 +141,8 @@ addCommonOptions(program.command('thread'))
         ])
     });
 
-addCommonOptions(program.command('server'))
-    .description('Download a single server')
-    .argument('<server-id>', 'Server ID')
-    .option('--after <date>', 'Date after which to retrieve history')
-    .option('--before <date>', 'Date before which to retrieve history')
-    .option('--threads-only', 'Retrieve only thread history, not channel history')
-    .action( async (serverId, opts) => {
-        await crawler(opts, 'server',
-        [
-            new ServerDiscordTask(serverId, opts.after, opts.before, opts.threadsOnly)
-        ])
-    });
 
-
-addCommonOptions(program.command('resume'))
+programCrawler.command('resume')
     .description('Resume an interrupted job')
     .argument('<path>', 'Job path')
     .action( async (path, opts) => {
@@ -145,7 +166,7 @@ program.command('reader')
 
 // convenience function because Wireshark's open file dialogs
 // are annoying
-program.command('open-wireshark')
+program.command('open-wireshark', {hidden: true})
     .argument('<job-path>', 'Path to job directory')
     .action( async (jobPath: string, opts) => {
         const args = [

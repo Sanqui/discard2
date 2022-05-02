@@ -10,8 +10,8 @@ Please keep in mind Discord's search filters are exclusive.  That means if you s
 
 
 ```bash
-npm run start -- profile -c none
-npm run start -- channel 954365197735317514 954365219411460138 -c none --after 2010-01-01 --before 2023-03-18
+npm run start -- crawler profile -c none
+npm run start -- crawler channel 954365197735317514 954365219411460138 -c none --after 2010-01-01 --before 2023-03-18
 ```
 
 Docker:
@@ -19,7 +19,7 @@ Docker:
 ```bash
 docker build -f Containerfile -t discard2 --target run .
 docker run --env-file=.env -v $PWD/out:/app/out:Z,U --cap-add=NET_RAW --cap-add=NET_ADMIN -it \
-    discard2 -- profile -c tshark --headless --block-images
+    discard2 -- crawler profile -c tshark --headless --block-images
 ```
 
 To use the `tshark` capture tool without Docker, you need to add your user to the wireshark group:

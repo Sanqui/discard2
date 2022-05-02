@@ -85,3 +85,46 @@ export class ServerDiscordTask extends DiscordTask {
         }
     }
 }
+
+
+
+
+export class ServersDiscordTask extends DiscordTask {
+    type = "ServersDiscordTask";
+    after?: Date;
+    before?: Date;
+
+    constructor(
+        after?: Date | string,
+        before?: Date | string,
+    ) {
+        super();
+
+        this.after = typeof after == "string" ? new Date(after) : after;
+        this.before = typeof before == "string" ? new Date(before) : before;
+    }
+
+    async perform(crawler: CrawlerInterface) {
+        const serverListSelector = "ul[data-list-id='guildsnav'] div[class^='scroller']";
+        await crawler.page.waitForSelector(serverListSelector);
+
+        const serverIds: string[] = [];
+        await scrollToBottom(crawler.page, serverListSelector,
+            async () => {
+                const serverEls = await crawler.page.$$(`${serverListSelector} div[aria-label="Servers"] div[data-list-item-id^="guildsnav___"]`);
+                for (const el of serverEls) {
+                    const serverId = await el.evaluate(el => el.attributes['data-list-item-id'].value.split('_')[3]) as string;
+                    if (serverIds.indexOf(serverId) == -1) {
+                        serverIds.push(serverId);
+                    }
+                }
+            }
+        );
+
+        await crawler.log(`Discovered ${serverIds.length} channels, creating tasks`);
+        
+        return serverIds.map(
+            el => new ServerDiscordTask(el, this.after, this.before)
+        );
+    }
+}

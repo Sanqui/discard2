@@ -1,10 +1,11 @@
 import { Project, Task } from '../../crawl';
 import { LoginDiscordTask } from './login';
 import { ChannelDiscordTask, DMDiscordTask, ThreadDiscordTask, ChannelThreadsDiscordTask } from './channel';
-import { ServerDiscordTask } from './server';
+import { ServerDiscordTask, ServersDiscordTask } from './server';
 import { ProfileDiscordTask } from './profile';
 
-export { LoginDiscordTask, DMDiscordTask, ChannelDiscordTask, ThreadDiscordTask, ChannelThreadsDiscordTask, ServerDiscordTask, ProfileDiscordTask };
+export { LoginDiscordTask, DMDiscordTask, ChannelDiscordTask, ThreadDiscordTask,
+    ChannelThreadsDiscordTask, ServerDiscordTask, ProfileDiscordTask, ServersDiscordTask };
 
 //const discord_url = new URL("https://discord.com/");
 //
