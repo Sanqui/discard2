@@ -1,43 +1,111 @@
-# discard2
-Archival tool.
+# Discard2
+**Discard2** is a high fidelity archival tool for the Discord chat platform.  It supports downloading channels, threads, servers, and DMs via a command-line interface.  
 
-## Usage
-WIP.
+## Overview
+Discard2 is written in **TypeScript** using **Node.js**. It consists of two main components: the **crawler** and the **reader**. The crawler is responsible for connecting to the Discord servers and downloading the requested data into a specified directory in a format suitable for archival. It uses a **capture tool** to accomplish the task of saving the client-server traffic. The reader is responsible for reading the data from the archive and converting it to other usable formats.
 
-Capture tools supported without Docker: `none`, `mitmproxy`
+### Capture tools
+Discard2 supports the following capture tools:
 
-Please keep in mind Discord's search filters are exclusive.  That means if you search for `after:2022-01-01` you only get messages beginning with 2022-01-02.
+- **none** - a dummy capture tool which does not save any data (useful only for verifying functionality)
+- **mitmdump** (mitmproxy) - captures HTTP and Websocket traffic using a proxy
+- **tshark** (Wireshark) - captures all traffic using packet capture.  **Not recommended**
 
+While thark creates higher fidelity archives, due to a bug in Wireshark, it is currently not possible to reliably recover data from the packet capture.  Therefore, it's currently recommended to use the mitmdump capture tool.
 
-```bash
-npm run start -- crawler profile -c none
-npm run start -- crawler channel 954365197735317514 954365219411460138 -c none --after 2010-01-01 --before 2023-03-18
-```
-
-Docker:
+## Setup
+To ensure a consistent environment, it is recommended to install Discard2 as a container in Docker or Podman.  The following command will set up the `discard2` container image:
 
 ```bash
 docker build -f Containerfile -t discard2 --target run .
-docker run --env-file=.env -v $PWD/out:/app/out:Z,U --cap-add=NET_RAW --cap-add=NET_ADMIN -it \
-    discard2 -- crawler profile -c tshark --headless --block-images
 ```
 
-To use the `tshark` capture tool without Docker, you need to add your user to the wireshark group:
+By default, Discard2 creates a new directory for each job in `out/`.
+
+Alternatively, Discard2 can be set up on a Linux system when all dependencies are installed, that being Node.js, Python, mitmproxy (in the bin/ directory), and the Python packages `brotli` and `mitmproxy`.  Please reference the [Containerfile](Containerfile) on how these dependencies are installed on Fedora Linux.
+
+## Usage
+
+To use Discard2 in Docker, please **prefix** all commands with the following line:
 
 ```bash
-sudo usermod -a -G wireshark [your_username]
+docker run --env-file=.env -v $PWD/out:/app/out:Z,U -it
 ```
 
-**Warning!**  When you choose the `tshark` capture tool outside of Docker, **all traffic** on your system gets saved.  Only use this capture without Docker for testing purposes, never publish them.
+You may replace /out with an output directory of your choosing.
 
-## Processing
+### Crawler
+
+To operate, Discard2's crawler needs to be provided with a **user account**.  Please create a `.env` file with the following contents:
+
+```
+DISCORD_EMAIL=
+DISCORD_PASSWORD=
+```
+
+and fill in the email and password for the account you wish to use.  **It is currently not recommended to use your primary user account** as using any unofficial tool may result in account termination and Discard2 hasn't gone through enough testing yet.
+
+First, it is recommended to test logging in using the following command.
+
+```bash
+npm run start -- crawler --capture-tool none --headless profile  
+```
+
+Discard2's crawler supports performing a variety of tasks.  For example, downloading all messages from the channel ID 954365219411460138 in server ID 954365197735317514 sent between 2022-01-01 and 2022-03-18, you would use:
+
+```bash
+npm run start -- crawler -c mitmproxy --headless channel 954365197735317514 954365219411460138 --after 2022-01-01 --before 2022-03-18
+```
+
+Note that Discord's date search is exclusive (so 2022-01-01 only downloads messages beginning with 2022-01-02).
+
+Full usage of the crawler is available under `crawler --help`:
+
+```
+Usage: discard2 crawler [options] [command]
+
+Start or resume a crawling job
+
+Options:
+  -h, --help                                             display help for command
+
+Commands:
+  profile [options]                                      Log in and fetch profile information
+  dm [options] <dm-id>                                   Download a single DM
+  servers [options]                                      Download all servers
+  server [options] <server-id>                           Download a single server
+  channel [options] <server-id> <channel-id>             Download a single channel
+  thread [options] <server-id> <channel-id> <thread-id>  Download a single thread
+  resume [options] <path>                                Resume an interrupted job
+```
+
+**Note**: To use the the `tshark` capture tool with Docker, you may have to add `--cap-add=NET_RAW --cap-add=NET_ADMIN` to your Docker command.  This is not necessary with Podman.
+
+**Warning:**  When you use the `tshark` capture tool outside of a container, **all** (possibly sensitive) traffic on your system gets saved.  Only use this capture tool without a container for testing purposes, never publish the resulting captures.
+
+### Reader
 
 To convert captures into JSONL suitable for further processing, use:
+
 ```bash
-npm run --silent start -- reader -f jsonl [job_directory] > out.jsonl
+npm run --silent start -- reader -f jsonl $JOB_DIRECTORY > out.jsonl
 ```
 
-## Run tests
+In order to import data into a running ElasticSearch instance, the following command should do the trick:
+
+```bash
+npm run --silent start -- reader -f elasticsearch $JOB_DIRECTORY | curl --cacert $ELASTICSEARCH_CRT -u elastic:$ELASTICSEARCH_PASS -s -H "Content-Type: application/x-ndjson" -XPOST https://$ELASTICSEARCH_HOST/_bulk --data-binary @-; echo
+```
+
+The currently supported output formats are:
+
+- `print` - plain text overview of requests and responses
+- `jsonl` - machine readable JSON lines with full request and response data
+- `elasticsearch` - message data in format for import to an Elasticsearch index
+` `derive-urls` - URLs of images and attachments for archival by other tools.
+
+
+## Running tests
 
 ```bash
 npm t
