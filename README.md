@@ -88,7 +88,7 @@ Commands:
 To convert captures into JSONL suitable for further processing, use:
 
 ```bash
-npm run --silent start -- reader -f jsonl $JOB_DIRECTORY > out.jsonl
+npm run --silent start -- reader -f raw-jsonl $JOB_DIRECTORY > out.jsonl
 ```
 
 In order to import data into a running ElasticSearch instance, the following command should do the trick:
@@ -99,8 +99,9 @@ npm run --silent start -- reader -f elasticsearch $JOB_DIRECTORY | curl --cacert
 
 The currently supported output formats are:
 
-- `print` - plain text overview of requests and responses
-- `jsonl` - machine readable JSON lines with full request and response data
+- `raw-print` - plain text overview of requests and responses
+- `raw-print` - machine readable JSON lines with full request and response data
+- `print` - plain text log of messages (suitable for grep)
 - `elasticsearch` - message data in format for import to an Elasticsearch index
 ` `derive-urls` - URLs of images and attachments for archival by other tools.
 

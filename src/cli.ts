@@ -5,7 +5,7 @@ import { spawn } from 'child_process';
 import { Crawler, Task } from './crawler/crawl';
 import { DiscordProject, DMDiscordTask, ChannelDiscordTask,
     ThreadDiscordTask, ServerDiscordTask, ServersDiscordTask } from './crawler/projects/discord';
-import { Reader } from './reader/reader';
+import { Reader, OutputFormats } from './reader/reader';
 import { DummyCaptureTool } from './captureTools';
 import { Mitmdump } from './captureTools/mitmdump';
 import { Tshark } from './captureTools/tshark';
@@ -155,7 +155,7 @@ program.command('reader')
     .argument('<job-path>', 'Path to job directory')
     .addOption(
         new Option('-f, --format <format>', 'Output format')
-            .choices(['print', 'jsonl', 'elasticsearch', 'derive-urls'])
+            .choices(Object.values(OutputFormats))
     )
     .option('--debug', 'Output debug information')
     .action( async (jobPath, opts) => {
