@@ -3,9 +3,9 @@ import * as puppeteer_types from 'puppeteer';
 import {CrawlerInterface} from '../../crawl';
 import { waitForAndClick, scrollToBottom, scrollToTop } from '../../utils';
 import { ChannelDiscordTask, ChannelThreadsDiscordTask } from './channel';
-import {DiscordTask} from './utils'
+import {DiscordID, DiscordTask} from './utils'
 
-export async function openServer(page: puppeteer_types.Page, serverId: string) {
+export async function openServer(page: puppeteer_types.Page, serverId: DiscordID) {
     const channelLinkSelector = `#channels ul li a[href^="/channels/${serverId}"]`;
     
     if (await page.$(channelLinkSelector)) {
@@ -38,7 +38,7 @@ export class ServerDiscordTask extends DiscordTask {
     before?: Date;
 
     constructor(
-        public serverId: string,
+        public serverId: DiscordID,
         after?: Date | string,
         before?: Date | string,
         public threadsOnly?: boolean,
@@ -64,7 +64,7 @@ export class ServerDiscordTask extends DiscordTask {
             async () => {
                 const channelEls = await crawler.page.$$('#channels ul li a[role="link"]');
                 for (const el of channelEls) {
-                    const channelId = await el.evaluate(el => el.attributes['data-list-item-id'].value.split('_')[3]) as string;
+                    const channelId = await el.evaluate(el => el.attributes['data-list-item-id'].value.split('_')[3]) as DiscordID;
                     if (channelIds.indexOf(channelId) == -1) {
                         channelIds.push(channelId);
                     }
@@ -113,7 +113,7 @@ export class ServersDiscordTask extends DiscordTask {
             async () => {
                 const serverEls = await crawler.page.$$(`${serverListSelector} div[aria-label="Servers"] div[data-list-item-id^="guildsnav___"]`);
                 for (const el of serverEls) {
-                    const serverId = await el.evaluate(el => el.attributes['data-list-item-id'].value.split('_')[3]) as string;
+                    const serverId = await el.evaluate(el => el.attributes['data-list-item-id'].value.split('_')[3]) as DiscordID;
                     if (serverIds.indexOf(serverId) == -1) {
                         serverIds.push(serverId);
                     }

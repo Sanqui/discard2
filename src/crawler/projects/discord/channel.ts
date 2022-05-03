@@ -6,9 +6,9 @@ import cliProgress from 'cli-progress';
 import { CrawlerInterface } from '../../crawl';
 import { retry, scrollToBottom, scrollToTop, waitForAndClick } from '../../utils';
 import { openServer } from './server';
-import {datetimeToDiscordSnowflake, DiscordTask} from './utils'
+import {datetimeToDiscordSnowflake, DiscordID, DiscordTask} from './utils'
 
-async function openChannel(crawler: CrawlerInterface, serverId: string, channelId: string) {
+async function openChannel(crawler: CrawlerInterface, serverId: DiscordID, channelId: DiscordID) {
     await openServer(crawler.page, serverId);
 
     const channelLinkSelector = `#channels ul li [data-list-item-id=channels___${channelId}]`;
@@ -50,20 +50,16 @@ async function openChannel(crawler: CrawlerInterface, serverId: string, channelI
 
 export class ChannelDiscordTask extends DiscordTask {
     type = "ChannelDiscordTask";
-    serverId: string;
-    channelId: string;
     after?: Date;
     before?: Date;
 
     constructor(
-        serverId: string,
-        channelId: string,
+        public serverId: DiscordID,
+        public channelId: DiscordID,
         after?: Date | string,
         before?: Date | string,
     ) {
         super();
-        this.serverId = serverId;
-        this.channelId = channelId;
 
         this.after = typeof after == "string" ? new Date(after) : after;
         this.before = typeof before == "string" ? new Date(before) : before;
@@ -75,7 +71,7 @@ export class ChannelDiscordTask extends DiscordTask {
         await page.keyboard.up('Control');
     }
 
-    async _searchAndClickFirstResult(crawler: CrawlerInterface): Promise<[string, number] | void> {
+    async _searchAndClickFirstResult(crawler: CrawlerInterface): Promise<[DiscordID, number] | void> {
         await this._pressCtrlF(crawler.page);
 
         async function typeDateFilter(name: string, date: Date) {
@@ -161,7 +157,7 @@ export class ChannelDiscordTask extends DiscordTask {
         const firstMessageId = await crawler.page.$eval(
             firstResultSelector,
             el => el.attributes['aria-labelledby'].value.split('-')[2]
-        ) as string;
+        ) as DiscordID;
 
         await crawler.log(`ID of first message in search results: ${firstMessageId}`);
 
@@ -210,7 +206,7 @@ export class ChannelDiscordTask extends DiscordTask {
         while (true) {
             const messageSelector = `${chatSelector} ol[data-list-id="chat-messages"] li[id^="chat-messages"]`;
             const messageIds = await crawler.page.$$eval(messageSelector, els => els.map(el => el.id.split('-')[2]));
-            const lastMessageId = messageIds[messageIds.length - 1];
+            const lastMessageId: DiscordID = messageIds[messageIds.length - 1];
 
             if (prevLastMessageId != lastMessageId) {
                 prevLastMessageId = lastMessageId;
@@ -269,12 +265,11 @@ export class ChannelDiscordTask extends DiscordTask {
 
 export class DMDiscordTask extends ChannelDiscordTask {
     type = "DMDiscordTask";
-    channelId: string;
     after?: Date;
     before?: Date;
 
     constructor(
-        channelId: string,
+        public channelId: DiscordID,
         after?: Date | string,
         before?: Date | string,
     ) {
@@ -338,11 +333,11 @@ export class DMDiscordTask extends ChannelDiscordTask {
 // since Discord doesn't re-request the thread list when
 // we open it, we have to keep it locally
 const threadCache: unknown[] = [];
-const readThreadsFromChannel: Map<string, boolean> = new Map();
+const readThreadsFromChannel: Map<DiscordID, boolean> = new Map();
 
 // Finds a given thread in a channel if provided,
 // else finds all threads
-async function findThread(crawler: CrawlerInterface, channelId: string, threadId?: string) {
+async function findThread(crawler: CrawlerInterface, channelId: DiscordID, threadId?: DiscordID) {
     await crawler.log(`Finding thread ${threadId} in channel ${channelId}...`);
     const threads: unknown[] = [];
     let stopSearching = false;
@@ -463,17 +458,13 @@ async function findThread(crawler: CrawlerInterface, channelId: string, threadId
 
 export class ThreadDiscordTask extends ChannelDiscordTask {
     type = "ThreadDiscordTask";
-    serverId: string;
-    channelId: string;
-    threadId: string;
 
     constructor(
-        serverId: string,
-        channelId: string,
-        threadId: string,
+        public serverId: DiscordID,
+        public channelId: DiscordID,
+        public threadId: DiscordID,
     ) {
         super(serverId, channelId, null, null);
-        this.threadId = threadId;
     }
 
     async _scrollChat(crawler: CrawlerInterface): Promise<void> {
@@ -539,8 +530,8 @@ export class ChannelThreadsDiscordTask extends DiscordTask {
     type = "ChannelThreadsDiscordTask";
 
     constructor(
-        public serverId: string,
-        public channelId: string,
+        public serverId: DiscordID,
+        public channelId: DiscordID,
     ) {
         super();
     }
@@ -552,7 +543,7 @@ export class ChannelThreadsDiscordTask extends DiscordTask {
         const threads = await findThread(crawler, this.channelId);
 
         return threads.map(
-            thread => new ThreadDiscordTask(this.serverId, this.channelId, thread['id'])
+            thread => new ThreadDiscordTask(this.serverId, this.channelId, thread['id'] as DiscordID)
         );
     }
 }
