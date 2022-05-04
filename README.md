@@ -100,7 +100,7 @@ npm run --silent start -- reader -f elasticsearch $JOB_DIRECTORY | curl --cacert
 The currently supported output formats are:
 
 - `raw-print` - plain text overview of requests and responses
-- `raw-print` - machine readable JSON lines with full request and response data
+- `raw-jsonl` - machine readable JSON lines with full request and response data
 - `print` - plain text log of messages (suitable for grep)
 - `elasticsearch` - message data in format for import to an Elasticsearch index
 ` `derive-urls` - URLs of images and attachments for archival by other tools.

@@ -146,5 +146,9 @@ test('parse a mitmdump server capture', async () => {
     ));
 });
 
-// TODO add a test to read a real pcapng capture,
-// not just those re-captured from the mitmdump replay
+test('test every reader output format', async () => {
+    for (const outputFormat of Object.values(OutputFormats)) {
+        const reader = new Reader('./test_data/server/', false, outputFormat);
+        await reader.read();
+    }
+});
