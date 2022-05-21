@@ -1,6 +1,8 @@
 # Discard2
 **Discard2** is a high fidelity archival tool for the Discord chat platform.  It supports downloading channels, threads, servers, and DMs via a command-line interface.  
 
+**Warning:** Discard2 is experimental software and there are known issues.  The authors are not responsible for possible negative consequences of using this program, including account suspension and data loss.
+
 ## Overview
 Discard2 is written in **TypeScript** using **Node.js**. It consists of two main components: the **crawler** and the **reader**. The crawler is responsible for connecting to the Discord servers and downloading the requested data into a specified directory in a format suitable for archival. It uses a **capture tool** to accomplish the task of saving the client-server traffic. The reader is responsible for reading the data from the archive and converting it to other usable formats.
 
@@ -11,7 +13,7 @@ Discard2 supports the following capture tools:
 - **mitmdump** (mitmproxy) - captures HTTP and Websocket traffic using a proxy
 - **tshark** (Wireshark) - captures all traffic using packet capture.  **Not recommended**
 
-While thark creates higher fidelity archives, due to a bug in Wireshark, it is currently not possible to reliably recover data from the packet capture.  Therefore, it's currently recommended to use the mitmdump capture tool.
+While tshark creates higher fidelity archives, due to a bug in Wireshark, it is currently not possible to reliably recover data from the packet capture.  Therefore, it's currently recommended to use the mitmdump capture tool.
 
 ## Setup
 To ensure a consistent environment, it is recommended to install Discard2 as a container in Docker or Podman.  The following command will set up the `discard2` container image:
@@ -79,9 +81,9 @@ Commands:
   resume [options] <path>                                Resume an interrupted job
 ```
 
-**Note**: To use the the `tshark` capture tool with Docker, you may have to add `--cap-add=NET_RAW --cap-add=NET_ADMIN` to your Docker command.  This is not necessary with Podman.
+**Note**: To use the `tshark` capture tool with Docker, you may have to add `--cap-add=NET_RAW --cap-add=NET_ADMIN` to your Docker command.  This is not necessary with Podman.
 
-**Warning:**  When you use the `tshark` capture tool outside of a container, **all** (possibly sensitive) traffic on your system gets saved.  Only use this capture tool without a container for testing purposes, never publish the resulting captures.
+**Warning**: When you use the `tshark` capture tool outside of a container, **all** (possibly sensitive) traffic on your system gets saved.  Only use this capture tool without a container for testing purposes, never publish the resulting captures.
 
 ### Reader
 
@@ -100,10 +102,10 @@ npm run --silent start -- reader -f elasticsearch $JOB_DIRECTORY | curl --cacert
 The currently supported output formats are:
 
 - `raw-print` - plain text overview of requests and responses
-- `raw-jsonl` - machine readable JSON lines with full request and response data
+- `raw-jsonl` - machine-readable JSON lines with full request and response data
 - `print` - plain text log of messages (suitable for grep)
 - `elasticsearch` - message data in format for import to an Elasticsearch index
-` `derive-urls` - URLs of images and attachments for archival by other tools.
+- `derive-urls` - URLs of images and attachments for archival by other tools.
 
 
 ## Running tests
@@ -124,3 +126,12 @@ docker run --cap-add=NET_RAW --cap-add=NET_ADMIN  discard2-test
 **Q:** Why is the account password included in the job state file?
 
 A: Because it is also included in the capture and cannot be removed unless you derive the capture.  This way it is more obvious.
+
+**Q:** How do I get IDs of various objects (channels, servers...)?
+
+A: Open the settings of your Discord client and enable "Developer Mode".  Then you can right-click objects such as channels and servers and copy their IDs.
+
+## Known issues
+
+- Processing threads is slow and not incremental
+- No attempt is made to fetch all emoji in a server
