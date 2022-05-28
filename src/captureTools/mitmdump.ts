@@ -6,7 +6,7 @@ import tcpPortUsed = require('tcp-port-used');
 import { CaptureTool } from '.';
 
 //const MITMDUMP_PATHS = ['mitmproxy/venv/bin/mitmdump', 'bin/mitmdump'];
-const MITMDUMP_PATHS = ['bin/mitmdump'];
+const MITMDUMP_PATHS = ['bin/mitmdump', '/usr/bin/mitmdump'];
 
 function findMitmdump() {
     let mitmdumpPath: string = null;

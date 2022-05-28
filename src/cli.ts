@@ -57,7 +57,6 @@ const programCrawler = new CrawlerCommand('crawler')
 program.addCommand(programCrawler);
 
 async function crawler(opts, mode: string, tasks: Task[], resume?: string) {
-    console.log(opts, opts.email, opts.captureTool)
     const crawler = new Crawler({
         project: new DiscordProject(opts.email, opts.password),
         tasks: tasks,
