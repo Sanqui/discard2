@@ -93,15 +93,16 @@ export class ChannelDiscordTask extends DiscordTask {
             while (!searchFinished) {
                 await crawler.page.waitForSelector(resultsSelector);
 
-                const interval = 200;
-                for (let i = 0; i < 10_000/interval; i++) {
+                const msWaitFor = 30_000;
+                const msInterval = 100;
+                for (let i = 0; i < msWaitFor/msInterval; i++) {
                     resultsText = await crawler.page.$eval(resultsSelector, el => el.textContent);
                     if (!["Searching…", "Indexing…"].includes(resultsText.trim())) {
                         searchFinished = true;
                         break;
                     }
 
-                    await crawler.page.waitForTimeout(interval);
+                    await crawler.page.waitForTimeout(msInterval);
                 }
                 if (searchFinished) {
                     // We're either going to get the search results, or an error
@@ -128,7 +129,7 @@ export class ChannelDiscordTask extends DiscordTask {
                         }
                     }
                 } else {
-                    throw Error("Did not get search results after 10 seconds.");
+                    throw Error(`Did not get search results after ${msWaitFor / 1_000} seconds.`);
                 }
             }
         }
