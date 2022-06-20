@@ -10,7 +10,7 @@ import { CaptureTool } from '../captureTools';
 
 puppeteer.use(StealthPlugin());
 
-const DISCARD_VERSION = '0.1.4';
+const DISCARD_VERSION = '0.1.5';
 
 type LogFunction = (...args: unknown[]) => Promise<void>;
 
@@ -21,6 +21,12 @@ export interface CrawlerInterface {
 
 export class Task {
     type: string;
+
+    result: object;
+
+    constructor() {
+        this.result = {};
+    }
 
     async perform(crawler: CrawlerInterface): Promise<Task[] | void> {
         return [];
@@ -171,6 +177,8 @@ export class Crawler {
                         task[key] = taskObj[key];
                     }
                 }
+                // Throw away previous result
+                task.result = {};
                 this.state.tasks.queued.push(task);
             }
 

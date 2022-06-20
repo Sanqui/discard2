@@ -5,6 +5,11 @@ import {DiscordTask} from './utils'
 
 export class LoginDiscordTask extends DiscordTask {
     type = "LoginDiscordTask";
+
+    result: {
+        nameTag: string
+    }
+
     constructor(
         public discordEmail: string,
         public discordPassword: string
@@ -54,9 +59,9 @@ export class LoginDiscordTask extends DiscordTask {
         }
 
         await crawler.page.waitForSelector('div[class^="nameTag"]')
-        const nameTag = await crawler.page.$eval('div[class^="nameTag"]', el => el.textContent);
+        this.result.nameTag = await crawler.page.$eval('div[class^="nameTag"]', el => el.textContent);
 
-        await crawler.log("Logged in: " + nameTag);
+        await crawler.log(`Logged in: ${this.result.nameTag}`);
         await crawler.page.waitForTimeout(1000);
 
         if (await crawler.page.$('form[class^="focusLock"]')) {

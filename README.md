@@ -56,7 +56,7 @@ npm run start -- crawler profile --capture-tool none --headless
 Discard2's crawler supports performing a variety of tasks.  For example, downloading all messages from the channel ID 954365219411460138 in server ID 954365197735317514 sent between 2022-01-01 and 2022-03-18, you would use:
 
 ```bash
-npm run start -- crawler channel 954365197735317514 954365219411460138 --after 2022-01-01 --before 2022-03-18 -c mitmproxy --headless
+npm run start -- crawler channel 954365197735317514 954365219411460138 --after 2022-01-01 --before 2022-03-18 -c mitmdump --headless
 ```
 
 Note that Discord's date search is exclusive (so 2022-01-01 only downloads messages beginning with 2022-01-02).

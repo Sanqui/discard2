@@ -31,11 +31,21 @@ export async function openServer(page: puppeteer_types.Page, serverId: DiscordID
     }
 }
 
+export async function getCurrentServerName(page: puppeteer_types.Page) {
+    return page.$eval(
+        `[class^="base"] [class^="sidebar"] [class^="header"] [class^="name"]`,
+        el => el.innerHTML.trim()
+    );
+}
 
 export class ServerDiscordTask extends DiscordTask {
     type = "ServerDiscordTask";
     after?: Date;
     before?: Date;
+
+    result: {
+        serverName: string;
+    }
 
     constructor(
         public serverId: DiscordID,
@@ -53,6 +63,8 @@ export class ServerDiscordTask extends DiscordTask {
     async perform(crawler: CrawlerInterface) {
         await openServer(crawler.page, this.serverId);
         
+        this.result.serverName = await getCurrentServerName(crawler.page);
+
         // Return a list of tasks for each channel
         // Discord loads channels dynamically, so we have to scroll through the list to see them all
 

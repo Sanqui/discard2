@@ -7,6 +7,7 @@ import {DiscordTask} from './utils'
 
 export class ProfileDiscordTask extends DiscordTask {
     type = "ProfileDiscordTask";
+
     constructor(
         public discordEmail?: string,
     ) {
@@ -17,9 +18,9 @@ export class ProfileDiscordTask extends DiscordTask {
         await retry(
             async () => {
                 await page.click('button[aria-label="User Settings"]')
-                await page.waitForSelector("#my-account-tab", { timeout: 5000 })
+                await page.waitForSelector("#my-account-tab", { timeout: 1000 })
             },
-            3,
+            15,
             "opening user settings"
         )
         await page.waitForSelector('#my-account-tab')

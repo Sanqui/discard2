@@ -5,7 +5,7 @@ import cliProgress from 'cli-progress';
 
 import { CrawlerInterface } from '../../crawl';
 import { retry, scrollToBottom, scrollToTop, waitForAndClick } from '../../utils';
-import { openServer } from './server';
+import { getCurrentServerName, openServer } from './server';
 import {datetimeToDiscordSnowflake, DiscordID, DiscordTask} from './utils'
 
 async function openChannel(crawler: CrawlerInterface, serverId: DiscordID, channelId: DiscordID) {
@@ -52,6 +52,15 @@ export class ChannelDiscordTask extends DiscordTask {
     type = "ChannelDiscordTask";
     after?: Date;
     before?: Date;
+
+    result: {
+        serverName: string,
+        channelName: string,
+        threadName: string,
+        dmUserName: string,
+        firstMessageId: DiscordID,
+        lastMessageId: DiscordID,
+    }
 
     constructor(
         public serverId: DiscordID,
@@ -190,7 +199,7 @@ export class ChannelDiscordTask extends DiscordTask {
         return [firstMessageId, messageCount];
     }
 
-    async _scrollChat(crawler: CrawlerInterface, messageCount: number) {
+    async _scrollChat(crawler: CrawlerInterface, messageCount: number): Promise<DiscordID> {
         // scroll down and stop until we either hit the bottom or a message
         // that's after the after date
 
@@ -202,12 +211,13 @@ export class ChannelDiscordTask extends DiscordTask {
         const bar1 = new cliProgress.SingleBar({}, cliProgress.Presets.shades_classic);
         bar1.start(messageCount, 0);
 
+        let lastMessageId: DiscordID = null;
         let prevLastMessageId = null;
         let jigglePhase = false;
         while (true) {
             const messageSelector = `${chatSelector} ol[data-list-id="chat-messages"] li[id^="chat-messages"]`;
             const messageIds = await crawler.page.$$eval(messageSelector, els => els.map(el => el.id.split('-')[2]));
-            const lastMessageId: DiscordID = messageIds[messageIds.length - 1];
+            lastMessageId = messageIds[messageIds.length - 1];
 
             if (prevLastMessageId != lastMessageId) {
                 prevLastMessageId = lastMessageId;
@@ -246,10 +256,19 @@ export class ChannelDiscordTask extends DiscordTask {
         const endTime = new Date().getTime();
 
         await crawler.log(`Channel ${this.channelId} finished (scrolled ${scrollTimes} times, took ${(endTime - startTime) / 1000 / 60} minutes)`);
+
+        return lastMessageId;
     }
 
     async perform(crawler: CrawlerInterface) {
         await openChannel(crawler, this.serverId, this.channelId);
+        
+        this.result.serverName = await getCurrentServerName(crawler.page);
+
+        this.result.channelName = await crawler.page.$eval(
+            `[class^="chat"] section[class^="title"] h3`,
+            el => el.innerHTML.trim()
+        );
 
         const result = await this._searchAndClickFirstResult(crawler);
 
@@ -257,7 +276,9 @@ export class ChannelDiscordTask extends DiscordTask {
         
         const [firstMessageId, messageCount] = result;
 
-        await this._scrollChat(crawler, messageCount);
+        this.result.firstMessageId = firstMessageId;
+
+        this.result.lastMessageId = await this._scrollChat(crawler, messageCount);
 
         //await crawler.page.waitForTimeout(15_000);
     }
@@ -327,6 +348,11 @@ export class DMDiscordTask extends ChannelDiscordTask {
         }, 10, "opening channel");
 
         await crawler.log(`DM ${this.channelId} opened`)
+
+        this.result.dmUserName = await crawler.page.$eval(
+            `[class^="chat"] section[class^="title"] h3`,
+            el => el.innerHTML.trim()
+        );
     }
 }
 
@@ -468,9 +494,13 @@ export class ThreadDiscordTask extends ChannelDiscordTask {
         super(serverId, channelId, null, null);
     }
 
-    async _scrollChat(crawler: CrawlerInterface): Promise<void> {
+    async _scrollChat(crawler: CrawlerInterface): Promise<DiscordID> {
+        let lastMessageId: DiscordID = null;
+
+        const chatSelector = `div[class^="chat"] div[class^="scroller"]`;
+        
         await crawler.log(`Crawling thread ${this.threadId} (unable to show progress)...`);
-        await crawler.page.$eval(`div[class^="chat"] div[class^="scroller"]`,
+        await crawler.page.$eval(chatSelector,
             el => el.scrollBy(0, 300)
         );
         await crawler.page.waitForTimeout(300);
@@ -493,16 +523,33 @@ export class ThreadDiscordTask extends ChannelDiscordTask {
         // Scroll up until we reach the chat header, signifying the beginning
         // of the thread
         while (!await crawler.page.$(`#chat-messages-${this.threadId}`)) {
-            await crawler.page.$eval(`div[class^="chat"] div[class^="scroller"]`,
+            await crawler.page.$eval(chatSelector,
                 el => el.scrollBy(0, -800)
             );
             await crawler.page.waitForTimeout(300);
         }
+
+        const messageSelector = `${chatSelector} ol[data-list-id="chat-messages"] li[id^="chat-messages"]`;
+        const messageIds = await crawler.page.$$eval(messageSelector, els => els.map(el => el.id.split('-')[2]));
+        lastMessageId = messageIds[messageIds.length - 1];
+
         await crawler.log(`Finished thread ${this.threadId}`);
+
+        return lastMessageId;
     }
 
     async perform(crawler: CrawlerInterface) {
         await openChannel(crawler, this.serverId, this.channelId);
+
+        this.result.channelName = await crawler.page.$eval(
+            `[class^="chat"] section[class^="title"] h3:first-child`,
+            el => el.innerHTML.trim()
+        );
+
+        this.result.threadName = await crawler.page.$eval(
+            `[class^="chat"] section[class^="title"] h3:last-child`,
+            el => el.innerHTML.trim()
+        );
 
         if (!readThreadsFromChannel[this.channelId]) {
             // build thread cache
@@ -522,7 +569,7 @@ export class ThreadDiscordTask extends ChannelDiscordTask {
             return;
         }
 
-        await this._scrollChat(crawler);
+        this.result.lastMessageId = await this._scrollChat(crawler);
     }
 }
 

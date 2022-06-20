@@ -1,0 +1,21 @@
+Discard2 changelog
+
+2020-06-20 version 0.1.5
+    Implement results structure for tasks.  Tasks can now produce results at runtime
+    which get saved into the state file.
+
+    The following results are implemented:
+    - Login task:
+        - nameTag (Name#0123)
+    - Server task:
+        - serverName
+    - Channel task:
+        - serverName
+        - channelName
+    - Thread task:
+        - serverName
+        - channelName
+        - threadName
+    - DM task:
+        - dmUserName
+    
