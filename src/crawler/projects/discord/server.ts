@@ -1,7 +1,7 @@
 import * as puppeteer_types from 'puppeteer';
 
 import {CrawlerInterface} from '../../crawl';
-import { waitForAndClick, scrollToBottom, scrollToTop } from '../../utils';
+import { waitForAndClick, scrollToBottom, scrollToTop, retry } from '../../utils';
 import { ChannelDiscordTask, ChannelThreadsDiscordTask } from './channel';
 import {DiscordID, DiscordTask} from './utils'
 
@@ -11,15 +11,17 @@ export async function openServer(page: puppeteer_types.Page, serverId: DiscordID
     if (await page.$(channelLinkSelector)) {
         // This server is already open
     } else {
-        await waitForAndClick(page, 
-            `[data-list-item-id=guildsnav___${serverId}]`,
-            `Server ID ${serverId} not found`
-        );
+        await retry(async () => {
+            await waitForAndClick(page, 
+                `[data-list-item-id=guildsnav___${serverId}]`,
+                `Server ID ${serverId} not found`
+            );
 
-        // Wait for a single channel link with this server ID to appear
-        // TODO: This may fail on servers without any available channel.
+            // Wait for a single channel link with this server ID to appear
+            // TODO: This may fail on servers without any available channel.
 
-        await page.waitForSelector(channelLinkSelector);
+            await page.waitForSelector(channelLinkSelector, {timeout: 3});
+        }, 5, "opening server");
     }
 
     // Make sure all categories are expanded  
