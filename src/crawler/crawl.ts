@@ -10,7 +10,7 @@ import { CaptureTool } from '../captureTools';
 
 puppeteer.use(StealthPlugin());
 
-const DISCARD_VERSION = '0.1.7';
+const DISCARD_VERSION = '0.1.8-wip';
 
 type LogFunction = (...args: unknown[]) => Promise<void>;
 
@@ -76,6 +76,7 @@ interface CrawlerSettings {
     blockImages?: boolean,
     resume?: string,
     tz?: string,
+    browserRestartInterval?: number
 }
 
 export class Crawler {
@@ -85,6 +86,7 @@ export class Crawler {
     jobName: string;
     dataPath: string;
     browser: puppeteer_types.Browser;
+    browserLaunched: Date;
     captureTool: CaptureTool;
 
     constructor(settings: CrawlerSettings) {
@@ -128,6 +130,7 @@ export class Crawler {
 
         const proxyServerAddress = this.settings.proxyServerAddress ?? this.captureTool.proxyServerAddress;
 
+        this.browserLaunched = new Date();
         const browser = await puppeteer.launch({
             args: [
                 proxyServerAddress ? `--proxy-server=${proxyServerAddress}` : '',
@@ -144,7 +147,7 @@ export class Crawler {
             // see https://github.com/GoogleChrome/chrome-launcher/blob/master/docs/chrome-flags-for-tools.md#test--debugging-flags
             //ignoreDefaultArgs: ["--enable-automation"],
 
-            headless: this.settings.headless,
+            headless: this.settings.headless || false,
             userDataDir: this.settings.browserDataDir,
             env: {
                 ...process.env, // TODO this should probably be written in the state file
@@ -240,6 +243,21 @@ export class Crawler {
         // this.state.settings.startingTasks = [...this.project.initialTasks];
 
         while (this.state.tasks.queued.length > 0) {
+            // Restart browser if necessary
+            if (this.settings.browserRestartInterval) {
+                const dateRestart = new Date(this.browserLaunched.getTime() + this.settings.browserRestartInterval*60000);
+                if (new Date() >= dateRestart) {
+                    await this.log(`Restarting browser after ${this.settings.browserRestartInterval} min`)
+                    await this.browser.close();
+                    [this.browser, page] = await this.launchBrowser();
+                    
+                    // requeue initial tasks
+                    this.state.tasks.queued = [
+                        ...this.settings.project.initialTasks,
+                        ...this.state.tasks.queued];
+                }
+            }
+                    
             const task = this.state.tasks.queued.shift();
             this.state.tasks.current = task;
             await this.saveState();

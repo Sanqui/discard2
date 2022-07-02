@@ -10,6 +10,10 @@ import { DummyCaptureTool } from './captureTools';
 import { Mitmdump } from './captureTools/mitmdump';
 import { Tshark } from './captureTools/tshark';
 
+// Use UTC.  Everywhere.  For everything.
+// If you use discard2 as a library, I recommend doing this too.
+process.env.TZ = 'Etc/UTC'
+
 const captureTools = {
     "none": DummyCaptureTool,
     "mitmdump": Mitmdump,
@@ -44,7 +48,10 @@ class CrawlerCommand extends Command {
                     .env('CAPTURE_TOOL').makeOptionMandatory()
             )
             .option('--headless', 'Run in headless mode')
-            .option('--block-images', 'Do not load images to conserve bandwidth');
+            .option('--block-images', 'Do not load images to conserve bandwidth')
+            .addOption(
+                new Option('--browser-restart-interval <number>', 'Interval in which to restart browser (in minutes)')
+            );
         
         return cmd;
     }
@@ -65,7 +72,8 @@ async function crawler(opts, mode: string, tasks: Task[], resume?: string) {
         captureTool: captureTools[opts.captureTool],
         headless: opts.headless,
         blockImages: opts.blockImages,
-        resume: resume
+        resume: resume,
+        browserRestartInterval: opts.browserRestartInterval
     });
 
     await crawler.run();
