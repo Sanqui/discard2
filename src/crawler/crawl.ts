@@ -132,6 +132,7 @@ export class Crawler {
 
         this.browserLaunched = new Date();
         const browser = await puppeteer.launch({
+            product: "chrome",
             args: [
                 proxyServerAddress ? `--proxy-server=${proxyServerAddress}` : '',
                 proxyServerAddress ? '--ignore-certificate-errors' : '',
