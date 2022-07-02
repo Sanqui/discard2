@@ -131,6 +131,10 @@ A: Because it is also included in the capture and cannot be removed unless you d
 
 A: Open the settings of your Discord client and enable "Developer Mode".  Then you can right-click objects such as channels and servers and copy their IDs.
 
+**Q:** How do I track memory and CPU usage of the browser used during crawling?
+
+A: You can use the `pidusage.jsonl` file in the job directory.  To extract just the value for memory (e.g. to plot with other tools) use `jq .browser.memory pidusage.jsonl`.
+
 ## Known issues
 
 - Processing threads is slow and not incremental

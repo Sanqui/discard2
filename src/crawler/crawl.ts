@@ -5,12 +5,13 @@ import * as puppeteer_types from 'puppeteer';
 import puppeteer from 'puppeteer-extra'
 import StealthPlugin from 'puppeteer-extra-plugin-stealth'
 import pressAnyKey from 'press-any-key';
+import pidusage from 'pidusage'
 
 import { CaptureTool } from '../captureTools';
 
 puppeteer.use(StealthPlugin());
 
-const DISCARD_VERSION = '0.1.8';
+const DISCARD_VERSION = '0.1.9';
 
 type LogFunction = (...args: unknown[]) => Promise<void>;
 
@@ -115,6 +116,21 @@ export class Crawler {
             `${new Date().toISOString()}: ${Array.from(args).join(' ')}\n`,
             'utf8'
         );
+    }
+
+    async logPidusage() {
+        if (this.browser && this.browser.process() && this.browser.process().pid) {
+            const stats = await pidusage(this.browser.process().pid);
+            const entry = {
+                'datetime': new Date().toISOString(),
+                'browser': stats
+            }
+            return await fs.appendFile(
+                `${this.dataPath}/pidusage.jsonl`,
+                JSON.stringify(entry) + "\n",
+                'utf8'
+            );
+        }
     }
 
     async launchBrowser(): Promise<[puppeteer_types.Browser, puppeteer_types.Page]> {
@@ -234,6 +250,17 @@ export class Crawler {
 
         let page: puppeteer_types.Page;
         [this.browser, page] = await this.launchBrowser()
+        
+        const pidusageInterval = async (time: number) => {
+            while (true) {
+                await this.logPidusage();
+                await new Promise(resolve => setTimeout(resolve, time));
+            }
+        }
+        
+        // Save browser CPU/ram usage every 30 seconds
+        void pidusageInterval(30_000)
+  
 
         this.state.tasks.queued = [
             ...this.settings.project.initialTasks,
@@ -257,7 +284,7 @@ export class Crawler {
                         ...this.state.tasks.queued];
                 }
             }
-                    
+
             const task = this.state.tasks.queued.shift();
             this.state.tasks.current = task;
             await this.saveState();
@@ -299,6 +326,7 @@ export class Crawler {
         await this.saveState();
 
         await this.browser.close();
+        this.browser = null;
         this.captureTool.close();
     }
 }

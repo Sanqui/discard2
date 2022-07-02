@@ -1,5 +1,9 @@
 Discard2 changelog
 
+2022-07-02 version 0.1.9
+    Crawler
+    - Log CPU and memory usage of the browser to pidusage.jsonl in job directory
+
 2022-07-02 version 0.1.8
     Crawler
     - Add an option to restart browser with given interval
