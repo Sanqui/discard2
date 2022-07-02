@@ -1,7 +1,8 @@
 // XXX should be abstract class, but then we can't pass it around
 export class CaptureTool {
+    name: string;
     proxyServerAddress: string | null;
-    replay: boolean = false;
+    replay = false;
 
     constructor(dataPath: string) {}
     async start(): Promise<void> {}
@@ -9,6 +10,7 @@ export class CaptureTool {
 }
 
 export class DummyCaptureTool extends CaptureTool {
+    name = "dummy";
     proxyServerAddress = null;
     
     async start() {

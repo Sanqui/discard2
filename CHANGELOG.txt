@@ -1,5 +1,8 @@
 Discard2 changelog
 
+2022-07-02 version 0.1.7
+    Refactor settings structure in job state.
+
 2020-06-26 version 0.1.6
     Retry opening servers.  Might fix opening servers low in the list.
 

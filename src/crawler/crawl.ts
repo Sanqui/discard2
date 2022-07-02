@@ -10,7 +10,7 @@ import { CaptureTool } from '../captureTools';
 
 puppeteer.use(StealthPlugin());
 
-const DISCARD_VERSION = '0.1.6';
+const DISCARD_VERSION = '0.1.7';
 
 type LogFunction = (...args: unknown[]) => Promise<void>;
 
@@ -33,7 +33,7 @@ export class Task {
     }
 }
 
-export type State = {
+export type CrawlerState = {
     datetimeSaved: string,
     client: {
         name: "discard2",
@@ -47,13 +47,7 @@ export type State = {
         error: boolean,
         errorMessage?: string,
     },
-    settings: {
-        resume: string,
-        captureToolName: string,
-        projectName: string,
-        startingTasks: Task[],
-        blockImages: boolean,
-    },
+    settings: CrawlerSettings,
     tasks: {
         queued: Task[],
         current: Task | null,
@@ -69,7 +63,7 @@ export interface Project {
     initialTasks: Task[], // runs even after restart
 }
 
-interface CrawlerParams {
+interface CrawlerSettings {
     project: Project,
     tasks: Task[],
     mode: string,
@@ -77,43 +71,33 @@ interface CrawlerParams {
     browserDataDir?: string,
     headless?: boolean,
     captureTool: typeof CaptureTool,
+    captureToolName?: string,
     proxyServerAddress?: string,
     blockImages?: boolean,
     resume?: string,
+    tz?: string,
 }
 
 export class Crawler {
+    settings: CrawlerSettings;
+    state: CrawlerState;
+
     jobName: string;
-    mode: string;
-    browser: puppeteer_types.Browser;
-    state: State;
-    project: Project;
     dataPath: string;
+    browser: puppeteer_types.Browser;
     captureTool: CaptureTool;
-    headless: boolean;
-    tasks: Task[];
-    browserDataDir: string | null;
-    proxyServerAddress: string | null;
-    blockImages?: boolean;
-    resume: string
 
-    constructor(params: CrawlerParams) {
-        this.project = params.project;
-
-        this.tasks = params.tasks;
-        this.mode = params.mode;
+    constructor(settings: CrawlerSettings) {
+        this.settings = settings;
+        this.settings.tz = 'Etc/UTC';
         // set job name to UTC timestamp
-        this.jobName = new Date().toISOString().replace(/[-:]/g, "").split(".")[0] + '-' + params.mode;
-        this.dataPath = (params.outputDir || 'out') + `/${this.jobName}`;
-        this.captureTool = new params.captureTool(this.dataPath);
-        this.headless = params.headless || false;
-        this.browserDataDir = params.browserDataDir;
-        this.proxyServerAddress = params.proxyServerAddress;
-        this.blockImages = params.blockImages;
-        this.resume = params.resume;
+        this.jobName = new Date().toISOString().replace(/[-:]/g, "").split(".")[0] + '-' + settings.mode;
+        this.dataPath = (settings.outputDir || 'out') + `/${this.jobName}`;
+        this.captureTool = new settings.captureTool(this.dataPath);
     }
-    
+
     async saveState() {
+        this.state.settings.captureToolName = this.captureTool.name;
         this.state.datetimeSaved = new Date().toISOString();
         return await fs.writeFile(
             `${this.dataPath}/state.json`,
@@ -131,62 +115,7 @@ export class Crawler {
         );
     }
 
-    async run() {
-        this.state = {
-            datetimeSaved: null,
-            client: {
-                name: "discard2",
-                version: DISCARD_VERSION,
-            },
-            job: {
-                datetimeStart: new Date().toISOString(),
-                datetimeEnd: null,
-                name: this.jobName,
-                completed: false,
-                error: false,
-            },
-            settings: {
-                resume: this.resume,
-                captureToolName: this.captureTool.constructor.name,
-                projectName: this.project.constructor.name,
-                startingTasks: [],
-                blockImages: this.blockImages
-            },
-            tasks: {
-                finished: [],
-                failed: [],
-                current: null,
-                queued: [],
-            }
-        };
-        await fs.mkdir(this.dataPath, { recursive: true });
-        await this.saveState();
-        await this.log("Initiated new job state name " + this.jobName);
-        if (this.resume) {
-            await this.log("Resuming from " + this.resume);
-
-            const resumeState = JSON.parse(await fs.readFile(`${this.resume}/state.json`, 'utf8')) as State;
-
-            for (const taskObj of [resumeState.tasks.current, ...resumeState.tasks.queued]) {
-                if (!(taskObj.type in this.project.taskClasses)) {
-                    throw Error(`Task type ${taskObj.type} not found in project`);
-                }
-                const task = new this.project.taskClasses[taskObj.type];
-                for (const key in taskObj) {
-                    if (key !== 'type') {
-                        task[key] = taskObj[key];
-                    }
-                }
-                // Throw away previous result
-                task.result = {};
-                this.state.tasks.queued.push(task);
-            }
-
-            await this.log(`Queued ${this.state.tasks.queued.length} tasks from resumed job`);
-        }
-
-        await this.captureTool.start()
-
+    async launchBrowser(): Promise<[puppeteer_types.Browser, puppeteer_types.Page]> {
         // Check if we're running in Docker.
         // If yes, we'll need to pass the `--no-sandbox` flag.
         // This is not necessary in Podman.
@@ -197,9 +126,9 @@ export class Crawler {
             await this.log("Running in Docker");
         } catch {}
 
-        const proxyServerAddress = this.proxyServerAddress ?? this.captureTool.proxyServerAddress;
+        const proxyServerAddress = this.settings.proxyServerAddress ?? this.captureTool.proxyServerAddress;
 
-        this.browser = await puppeteer.launch({
+        const browser = await puppeteer.launch({
             args: [
                 proxyServerAddress ? `--proxy-server=${proxyServerAddress}` : '',
                 proxyServerAddress ? '--ignore-certificate-errors' : '',
@@ -215,21 +144,21 @@ export class Crawler {
             // see https://github.com/GoogleChrome/chrome-launcher/blob/master/docs/chrome-flags-for-tools.md#test--debugging-flags
             //ignoreDefaultArgs: ["--enable-automation"],
 
-            headless: this.headless,
-            userDataDir: this.browserDataDir,
+            headless: this.settings.headless,
+            userDataDir: this.settings.browserDataDir,
             env: {
-                ...process.env,
-                'TZ': 'Etc/UTC'
+                ...process.env, // TODO this should probably be written in the state file
+                'TZ': this.settings.tz
             }
         });
-        const page = await this.browser.newPage();
+        const page = await browser.newPage();
         page.on('error', (err) => {
             void this.log(`Page error: ${err}`);
             throw new Error(`Page error: ${err}`);
             // TODO proper handling (restart current task or crash)
         });
 
-        if (this.blockImages) {
+        if (this.settings.blockImages) {
             await page.setRequestInterception(true);
             page.on('request', (request) => {
                 if (request.resourceType() === 'image') {
@@ -247,12 +176,68 @@ export class Crawler {
 
         await page.bringToFront();
 
+        return [browser, page];
+    }
+
+    async run() {
+        this.state = {
+            datetimeSaved: null,
+            client: {
+                name: "discard2",
+                version: DISCARD_VERSION,
+            },
+            job: {
+                datetimeStart: new Date().toISOString(),
+                datetimeEnd: null,
+                name: this.jobName,
+                completed: false,
+                error: false,
+            },
+            settings: this.settings,
+            tasks: {
+                finished: [],
+                failed: [],
+                current: null,
+                queued: [],
+            }
+        };
+        await fs.mkdir(this.dataPath, { recursive: true });
+        await this.saveState();
+        await this.log("Initiated new job state name " + this.jobName);
+        if (this.settings.resume) {
+            await this.log("Resuming from " + this.settings.resume);
+
+            const resumeState = JSON.parse(await fs.readFile(`${this.settings.resume}/state.json`, 'utf8')) as CrawlerState;
+
+            for (const taskObj of [resumeState.tasks.current, ...resumeState.tasks.queued]) {
+                if (!(taskObj.type in this.settings.project.taskClasses)) {
+                    throw Error(`Task type ${taskObj.type} not found in project`);
+                }
+                const task = new this.settings.project.taskClasses[taskObj.type];
+                for (const key in taskObj) {
+                    if (key !== 'type') {
+                        task[key] = taskObj[key];
+                    }
+                }
+                // Throw away previous result
+                task.result = {};
+                this.state.tasks.queued.push(task);
+            }
+
+            await this.log(`Queued ${this.state.tasks.queued.length} tasks from resumed job`);
+        }
+
+        await this.captureTool.start()
+
+        let page: puppeteer_types.Page;
+        [this.browser, page] = await this.launchBrowser()
+
         this.state.tasks.queued = [
-            ...this.project.initialTasks,
-            ...this.tasks,
+            ...this.settings.project.initialTasks,
+            ...this.settings.tasks,
             ...this.state.tasks.queued];
-        
-        this.state.settings.startingTasks = [...this.project.initialTasks];
+
+        // this.state.settings.startingTasks = [...this.project.initialTasks];
 
         while (this.state.tasks.queued.length > 0) {
             const task = this.state.tasks.queued.shift();
@@ -269,7 +254,7 @@ export class Crawler {
                 const screenshotPath = `${this.dataPath}/error.png`;
                 await page.screenshot({path: screenshotPath});
                 await this.log(`Saved screenshot to ${screenshotPath}`);
-                if (!this.headless) {
+                if (!this.settings.headless) {
                     await pressAnyKey("Press any key to exit...");
                 }
                 await this.browser.close();

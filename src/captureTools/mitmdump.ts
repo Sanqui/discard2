@@ -28,6 +28,7 @@ function findMitmdump() {
 }
 
 export class Mitmdump extends CaptureTool {
+    name = "mitmdump";
     supportsReplay = true;
     proxyServerAddress = "127.0.0.1:8080";
 

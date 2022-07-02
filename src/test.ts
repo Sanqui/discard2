@@ -1,6 +1,6 @@
 import * as fs from 'fs/promises';
 
-import { Crawler, State } from './crawler/crawl';
+import { Crawler, CrawlerState } from './crawler/crawl';
 import { DiscordProject, ProfileDiscordTask, ChannelDiscordTask, ServerDiscordTask } from './crawler/projects/discord';
 import { DummyCaptureTool } from './captureTools';
 import { Mitmdump, MitmdumpReplay } from './captureTools/mitmdump';
@@ -59,7 +59,7 @@ test('runs a profile job against a replay', async () => {
     await crawler.run()
     mitmdump.close();
 
-    const state = JSON.parse(await fs.readFile(`${crawler.dataPath}/state.json`, 'utf8')) as State;
+    const state = JSON.parse(await fs.readFile(`${crawler.dataPath}/state.json`, 'utf8')) as CrawlerState;
     expect(state.job.completed).toBeTruthy();
 });
 
@@ -103,7 +103,7 @@ test('runs a channel job against a replay', async () => {
     await crawler.run()
     mitmdump.close();
 
-    const state = JSON.parse(await fs.readFile(`${crawler.dataPath}/state.json`, 'utf8')) as State;
+    const state = JSON.parse(await fs.readFile(`${crawler.dataPath}/state.json`, 'utf8')) as CrawlerState;
     expect(state.job.completed).toBeTruthy();
 
     await checkForMessages(crawler.dataPath, new Set(["testing 123", "300"]));
@@ -128,7 +128,7 @@ test('runs a server job against a replay', async () => {
     await crawler.run()
     mitmdump.close();
 
-    const state = JSON.parse(await fs.readFile(`${crawler.dataPath}/state.json`, 'utf8')) as State;
+    const state = JSON.parse(await fs.readFile(`${crawler.dataPath}/state.json`, 'utf8')) as CrawlerState;
     expect(state.job.completed).toBeTruthy();
 
     console.log(`dataPath: ${crawler.dataPath}`);

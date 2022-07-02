@@ -3,6 +3,7 @@ import { spawn, ChildProcess } from 'child_process';
 import { CaptureTool } from '.';
 
 export class Tshark extends CaptureTool {
+    name = "tshark";
     process: ChildProcess;
     filePath: string;
     closed: boolean;

@@ -3,7 +3,7 @@ import * as fs from 'fs/promises';
 //import zlib from 'zlib';
 //import { Message } from 'discord.js';
 
-import { State } from '../crawler/crawl';
+import { CrawlerState } from '../crawler/crawl';
 
 import { ReaderOutput } from './output';
 import { readPcapng } from './tshark/tshark';
@@ -96,7 +96,7 @@ const outputFunctions: {[key in OutputFormats]: (data: ReaderOutput, reader?: Re
 }
 
 export class Reader {
-    state: State;
+    state: CrawlerState;
 
     constructor(
         public path: string,
@@ -127,20 +127,21 @@ export class Reader {
 
     async read() {
         const contents = await fs.readFile(`${this.path}/state.json`, 'utf8');
-        this.state = JSON.parse(contents) as State;
+        this.state = JSON.parse(contents) as CrawlerState;
     
-        this.log(`Loaded job ${this.state.job.name} (capture tool ${this.state.settings.captureToolName})`);
+        const captureToolName = this.state.settings.captureTool.name.toLowerCase();
+        this.log(`Loaded job ${this.state.job.name} (capture tool ${captureToolName})`);
 
-        if (this.state.settings.captureToolName == "Tshark") {
+        if (captureToolName == "tshark") {
             await readPcapng(this.path,
                 this.log.bind(this), this.logDebug.bind(this), this.output.bind(this)
             );
-        } else if (this.state.settings.captureToolName == "Mitmdump") {
+        } else if (captureToolName == "mitmdump") {
             await readMitmproxy(this.path,
                 this.log.bind(this), this.logDebug.bind(this), this.output.bind(this)
             );
         } else {
-            throw new Error(`Unsupported capture tool: ${this.state.settings.captureToolName}`);
+            throw new Error(`Unsupported capture tool: ${captureToolName}`);
         }
     }
 
