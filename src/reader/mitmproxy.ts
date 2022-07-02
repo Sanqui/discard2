@@ -23,7 +23,7 @@ export async function readMitmproxy(
         }
     });
 
-    const discordWsStreamInflator = new ZlibSync.Inflate();
+    let discordWsStreamInflator = new ZlibSync.Inflate();
 
     let obj: ReaderOutput | ReaderOutputWsCompressed;
     for await ({value: obj} of process.stdout.pipe(new JsonlParser())) {
@@ -33,7 +33,17 @@ export async function readMitmproxy(
             discordWsStreamInflator.push(Buffer.from(obj.compressed_data, 'hex'), ZlibSync.Z_SYNC_FLUSH);
 
             if (discordWsStreamInflator.err) {
-                throw Error(`WS stream inflate failed: ${discordWsStreamInflator.msg}`);
+                // This is a silly solution that will bite us if we ever have interleaved WS streams,
+                // but it'll do for sequential ones for now.
+                // We'll try to create a new WS stream inflator and decode using that one.
+                // Only fail if that one fails too.
+                    
+                discordWsStreamInflator = new ZlibSync.Inflate();
+                discordWsStreamInflator.push(Buffer.from(obj.compressed_data, 'hex'), ZlibSync.Z_SYNC_FLUSH);
+
+                if (discordWsStreamInflator.err) {
+                    throw Error(`WS stream inflate failed: ${discordWsStreamInflator.msg}`);
+                }
             }
 
             const data = JSON.parse(discordWsStreamInflator.result?.toString()) as unknown;

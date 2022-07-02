@@ -129,7 +129,7 @@ export class Reader {
         const contents = await fs.readFile(`${this.path}/state.json`, 'utf8');
         this.state = JSON.parse(contents) as CrawlerState;
     
-        const captureToolName = this.state.settings.captureTool.name.toLowerCase();
+        const captureToolName = this.state.settings.captureToolName.toLowerCase();
         this.log(`Loaded job ${this.state.job.name} (capture tool ${captureToolName})`);
 
         if (captureToolName == "tshark") {

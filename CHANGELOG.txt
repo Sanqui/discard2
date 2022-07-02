@@ -1,10 +1,13 @@
 Discard2 changelog
 
-????-??-?? version 0.1.8
+2022-07-02 version 0.1.8
     Crawler
     - Add an option to restart browser with given interval
       This is useful because Chrome leaks RAM like a sieve.  But it's
       not a long-term solution. 
+    
+    Reader
+    - With mitmdump, support multiple websocket streams in capture
 
 2022-07-02 version 0.1.7
     Refactor settings structure in job state.
