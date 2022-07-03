@@ -11,7 +11,7 @@ import { CaptureTool } from '../captureTools';
 
 puppeteer.use(StealthPlugin());
 
-const DISCARD_VERSION = '0.1.9';
+const DISCARD_VERSION = '0.1.10-wip';
 
 type LogFunction = (...args: unknown[]) => Promise<void>;
 
@@ -125,12 +125,14 @@ export class Crawler {
                 'datetime': new Date().toISOString(),
                 'browser': stats
             }
-            return await fs.appendFile(
+            await fs.appendFile(
                 `${this.dataPath}/pidusage.jsonl`,
                 JSON.stringify(entry) + "\n",
                 'utf8'
             );
+            return true;
         }
+        return false;
     }
 
     async launchBrowser(): Promise<[puppeteer_types.Browser, puppeteer_types.Page]> {
@@ -251,11 +253,15 @@ export class Crawler {
 
         let page: puppeteer_types.Page;
         [this.browser, page] = await this.launchBrowser()
+
+        let pidusageTimeout: NodeJS.Timeout;
         
         const pidusageInterval = async (time: number) => {
             while (true) {
-                await this.logPidusage();
-                await new Promise(resolve => setTimeout(resolve, time));
+                let result = await this.logPidusage();
+                if (result) {
+                    await new Promise(resolve => pidusageTimeout = setTimeout(resolve, time));
+                }
             }
         }
         
@@ -328,7 +334,11 @@ export class Crawler {
 
         await this.browser.close();
         this.browser = null;
+        clearTimeout(pidusageTimeout);
+
         this.captureTool.close();
+
+        await this.log("Exiting crawler");
     }
 }
 
