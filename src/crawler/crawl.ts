@@ -44,6 +44,7 @@ export type CrawlerState = {
         datetimeStart: string,
         datetimeEnd: string,
         name: string,
+        explain: string,
         completed: boolean,
         error: boolean,
         errorMessage?: string,
@@ -77,7 +78,8 @@ interface CrawlerSettings {
     blockImages?: boolean,
     resume?: string,
     tz?: string,
-    browserRestartInterval?: number
+    browserRestartInterval?: number,
+    explain?: string,
 }
 
 export class Crawler {
@@ -85,6 +87,7 @@ export class Crawler {
     state: CrawlerState;
 
     jobName: string;
+    explain?: string = "";
     dataPath: string;
     browser: puppeteer_types.Browser;
     browserLaunched: Date;
@@ -97,6 +100,8 @@ export class Crawler {
         this.jobName = new Date().toISOString().replace(/[-:]/g, "").split(".")[0] + '-' + settings.mode;
         this.dataPath = (settings.outputDir || 'out') + `/${this.jobName}`;
         this.captureTool = new settings.captureTool(this.dataPath);
+        this.explain = this.settings.explain;
+        delete this.settings.explain;
     }
 
     async saveState() {
@@ -212,6 +217,7 @@ export class Crawler {
                 datetimeStart: new Date().toISOString(),
                 datetimeEnd: null,
                 name: this.jobName,
+                explain: this.explain,
                 completed: false,
                 error: false,
             },
