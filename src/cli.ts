@@ -47,6 +47,9 @@ class CrawlerCommand extends Command {
                     .choices(['none', 'mitmdump', 'tshark'])
                     .env('CAPTURE_TOOL').makeOptionMandatory()
             )
+            .addOption(
+                new Option('--explain <message>', 'Explain')
+            )
             .option('--headless', 'Run in headless mode')
             .option('--block-images', 'Do not load images to conserve bandwidth')
             .addOption(
@@ -73,7 +76,8 @@ async function crawler(opts, mode: string, tasks: Task[], resume?: string) {
         headless: opts.headless,
         blockImages: opts.blockImages,
         resume: resume,
-        browserRestartInterval: opts.browserRestartInterval
+        browserRestartInterval: opts.browserRestartInterval,
+        explain: opts.explain
     });
 
     await crawler.run();
