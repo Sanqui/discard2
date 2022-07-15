@@ -1,5 +1,9 @@
 Discard2 changelog
 
+2022-07-15 version 0.1.10
+    Crawler
+    - Add explain option (thanks TheTechRobo!)
+
 2022-07-02 version 0.1.9
     Crawler
     - Log CPU and memory usage of the browser to pidusage.jsonl in job directory

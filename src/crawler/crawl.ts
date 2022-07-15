@@ -11,7 +11,7 @@ import { CaptureTool } from '../captureTools';
 
 puppeteer.use(StealthPlugin());
 
-const DISCARD_VERSION = '0.1.10-wip';
+const DISCARD_VERSION = '0.1.10';
 
 type LogFunction = (...args: unknown[]) => Promise<void>;
 
