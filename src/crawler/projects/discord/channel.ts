@@ -52,6 +52,9 @@ export class ChannelDiscordTask extends DiscordTask {
     type = "ChannelDiscordTask";
     after?: Date;
     before?: Date;
+    progress: {
+        lastMessageId?: DiscordID
+    };
 
     result: {
         serverName: string,
@@ -72,6 +75,8 @@ export class ChannelDiscordTask extends DiscordTask {
 
         this.after = typeof after == "string" ? new Date(after) : after;
         this.before = typeof before == "string" ? new Date(before) : before;
+
+        this.progress = {}
     }
 
     async _pressCtrlF(page: puppeteer_types.Page) {
@@ -215,6 +220,8 @@ export class ChannelDiscordTask extends DiscordTask {
         let prevLastMessageId = null;
         let jigglePhase = false;
         while (true) {
+            this.progress.lastMessageId = lastMessageId;
+
             const messageSelector = `${chatSelector} ol[data-list-id="chat-messages"] li[id^="chat-messages"]`;
             const messageIds = await crawler.page.$$eval(messageSelector, els => els.map(el => el.id.split('-')[2]));
             lastMessageId = messageIds[messageIds.length - 1];
@@ -256,6 +263,8 @@ export class ChannelDiscordTask extends DiscordTask {
         const endTime = new Date().getTime();
 
         await crawler.log(`Channel ${this.channelId} finished (scrolled ${scrollTimes} times, took ${(endTime - startTime) / 1000 / 60} minutes)`);
+
+        this.progress.lastMessageId = lastMessageId;
 
         return lastMessageId;
     }

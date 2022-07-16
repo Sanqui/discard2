@@ -11,7 +11,7 @@ import { CaptureTool } from '../captureTools';
 
 puppeteer.use(StealthPlugin());
 
-const DISCARD_VERSION = '0.1.10';
+const DISCARD_VERSION = '0.1.11-wip';
 
 type LogFunction = (...args: unknown[]) => Promise<void>;
 
@@ -22,6 +22,8 @@ export interface CrawlerInterface {
 
 export class Task {
     type: string;
+
+    progress?: any;
 
     result: object;
 
@@ -306,7 +308,13 @@ export class Crawler {
 
             let newTasks: Task[] | void;
             try {
-                newTasks = await task.perform({log: this.log.bind(this) as LogFunction, page: page});
+                
+                newTasks = await task.perform(
+                    {
+                        log: this.log.bind(this) as LogFunction,
+                        page: page
+                    } as CrawlerInterface
+                );
             } catch (error) {
                 await this.log(`Caught error while performing task: ${error}`);
                 const screenshotPath = `${this.dataPath}/error.png`;
