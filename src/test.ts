@@ -1,7 +1,7 @@
 import * as fs from 'fs/promises';
 
 import { Crawler, CrawlerState } from './crawler/crawl';
-import { DiscordProject, ProfileDiscordTask, ChannelDiscordTask, ServerDiscordTask } from './crawler/projects/discord';
+import { DiscordProject, ProfileDiscordTask, ChannelDiscordTask, ServerDiscordTask, LoginDiscordTask } from './crawler/projects/discord';
 import { DummyCaptureTool } from './captureTools';
 import { Mitmdump, MitmdumpReplay } from './captureTools/mitmdump';
 import { Tshark } from './captureTools/tshark';
@@ -43,14 +43,19 @@ test('initializes a crawler', async () => {
 });
 
 test('runs a profile job against a replay', async () => {
-    const mitmdump = new MitmdumpReplay('./test_data/profile/');
+    const dataPath = "./test_data/profile/";
+    // read the account username and pasword from the state file
+    const testState = JSON.parse(await fs.readFile(`${dataPath}/state.json`, 'utf8')) as CrawlerState;
+    const initialTask = testState.settings.project.initialTasks[0] as LoginDiscordTask;
+
+    const mitmdump = new MitmdumpReplay(dataPath);
     const crawler = new Crawler({
-        project: new DiscordProject(TEST_DISCORD_EMAIL, TEST_DISCORD_PASSWORD),
+        project: new DiscordProject(initialTask.discordEmail, initialTask.discordPassword),
         tasks: [],
         mode: 'profile',
         outputDir: await fs.mkdtemp("/tmp/discard2-test-"),
         captureTool: Tshark,
-        headless: true,
+        headless: false,
         proxyServerAddress: mitmdump.proxyServerAddress,
         blockImages: true,
     });

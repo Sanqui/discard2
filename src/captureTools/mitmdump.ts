@@ -30,7 +30,8 @@ function findMitmdump() {
 export class Mitmdump extends CaptureTool {
     name = "mitmdump";
     supportsReplay = true;
-    proxyServerAddress = "127.0.0.1:8080";
+    port = 11778;
+    proxyServerAddress = `127.0.0.1:${this.port}`;
 
     process: ChildProcess;
     filePath: string;
@@ -49,11 +50,15 @@ export class Mitmdump extends CaptureTool {
 
     async start() {
         console.log("Starting mitmdump");
-        let args = [];
+        let args = ["-q", "--listen-port", this.port.toString()];
         if (!this.replay) {
-            args = ["-q", "-w", this.filePath]
+            args = [...args, "-w", this.filePath];
         } else {
-            args = ["-q", "--server-replay", this.filePath]
+            args = [
+                ...args,
+                "--server-replay", this.filePath,
+                "--server-replay-kill-extra", "--server-replay-nopop"
+            ]
         }
         this.closed = false;
 
