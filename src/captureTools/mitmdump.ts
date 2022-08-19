@@ -93,7 +93,7 @@ export class Mitmdump extends CaptureTool {
         }*/
         // Quiet mitmdump produces no output, so wait
         // for it to pick itself up...
-        await tcpPortUsed.waitUntilUsed(8080, 500, 4000)
+        await tcpPortUsed.waitUntilUsed(this.port, 500, 4000)
         await new Promise(r => setTimeout(r, 2000));
     }
 
