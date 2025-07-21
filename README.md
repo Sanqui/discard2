@@ -1,3 +1,6 @@
+> [!CAUTION]
+> Discard2 is unmaintained.  It will likely not run given the amount of changes to the Discord UI over the years.  For a replacement to this project, I recommend [Discordless](https://github.com/roachbones/Discordless).  It has the same archival grade as discard2 (uses mitmproxy to capture http-level traffic with Discord server) and it can be used to proxy a running Discord client, providing seamless, real-time logging of everything the user (you!) sees.  Due to this design it also does not violate the Discord Terms of Service.  A future addition to the project, or another program composed along with Discordless, could add functionality to automatically archive the history of Discord channels, either using a technique similar to Discard2 (Puppeteer/Playwright), or another method like a browser extension or self-botting.
+
 # Discard2
 **Discard2** is a high fidelity archival tool for the Discord chat platform.  It supports downloading channels, threads, servers, and DMs via a command-line interface.  
 
